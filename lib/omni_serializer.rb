@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require_relative "omni_serializer/version"
+require_relative 'omni_serializer/version'
 
-module OmniSerializer
-  class Error < StandardError; end
+class OmniSerializer::Error < StandardError
   # Your code goes here...
 end
