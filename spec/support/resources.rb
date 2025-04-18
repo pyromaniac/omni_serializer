@@ -48,6 +48,15 @@ class UserResource < BaseResource
   has_many :posts, resource: 'PostCollectionResource'
 end
 
+class CategoryResource < BaseResource
+  attribute :category_name do
+    object.name
+  end
+  has_one :parent, resource: 'CategoryResource'
+  has_many :children, resource: 'CategoryResource'
+  has_many :posts, resource: 'PostCollectionResource'
+end
+
 class CommentResource < BaseResource
   attribute :comment_body do
     object.body

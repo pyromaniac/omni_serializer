@@ -109,12 +109,6 @@ class OmniSerializer::Jsonapi::QueryBuilder
     end
   end
 
-  # {[["posts", PostCollectionResource]] => {"comments" => {"comment-body": [43], "non-member": "value"}, "posts-title" => "foobar"}}
-  # {
-  #   [[:posts, PostCollectionResource]] => { :posts_title => "foobar" }
-  #   [[:posts, PostCollectionResource], [:comments, CommentCollectionResource]] => { :comment_body => [42, 43], :non_member => "value" }
-  # }
-
   def build_filter_tree(filter)
     raise OmniSerializer::Error, '`filter` parameter must be an mapping' unless filter.is_a?(Hash)
 
@@ -160,11 +154,14 @@ class OmniSerializer::Jsonapi::QueryBuilder
     end
   end
 
-  def query_level(resource_class, path: [], **query_options)
-    query_members(resource_class, path:, **query_options) + query_associations(resource_class, path:, **query_options)
+  def query_level(resource_class, includes_tree:, path: [], **query_options)
+    includes_tree ||= {} if resource_class.collection?
+
+    query_members(resource_class, path:, includes_tree:, **query_options) +
+      query_associations(resource_class, path:, includes_tree:, **query_options)
   end
 
-  def query_members(resource_class, fields:, **)
+  def query_members(resource_class, fields:, includes_tree:, **)
     members = if fields.key?(resource_class)
       fields[resource_class]
     else
@@ -178,8 +175,6 @@ class OmniSerializer::Jsonapi::QueryBuilder
   end
 
   def query_associations(resource_class, includes_tree:, includes_map:, filter_tree:, path:, **query_options)
-    includes_tree ||= {} if resource_class.collection?
-
     return [] if includes_tree.nil?
 
     includes_map[resource_class].map do |association|

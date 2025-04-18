@@ -16,13 +16,11 @@ class OmniSerializer::Jsonapi
   def serialize(value, with:, context: {}, params: {})
     query = query_builder.call(with, **params)
     data = evaluator.call(value, query, context:)
-    included = collect_linkage(data)
-      .group_by { |placeholder| [placeholder.resource.class, placeholder.resource.id] }
-      .except(*top_level_linkage(data))
+    included = collect_linkage(data).except(*top_level_linkage(data))
     result = { data: render_data(data) }
     unless included.empty?
-      result[:included] = included.values.map do |placeholders|
-        render_resource(placeholders.first)
+      result[:included] = included.values.map do |placeholder|
+        render_resource(placeholder)
       end
     end
     result
@@ -31,26 +29,27 @@ class OmniSerializer::Jsonapi
   private
 
   def collect_linkage(value)
-    case value
-    when OmniSerializer::Evaluator::Placeholder
-      collect_placeholder_linkage(value)
-    when Array
-      value.flat_map { |item| collect_linkage(item) }
-    when Hash
-      value.values.flat_map { |item| collect_linkage(item) }
-    else
-      collect_linkage(value)
-    end
-  end
+    queue = value.is_a?(Array) ? [*value] : [value]
+    placeholders = {}
 
-  def collect_placeholder_linkage(placeholder)
-    if placeholder.resource.class.collection?
-      collect_linkage(placeholder.values[placeholder.resource.class.collection_member.name])
-    else
-      [placeholder] + placeholder.resource.class.members.values.grep(OmniSerializer::Resource::Association).flat_map do |association|
-        placeholder.values.key?(association.name) ? collect_linkage(placeholder.values[association.name]) : []
+    until queue.empty?
+      placeholder = queue.shift
+
+      enqueue = if placeholder.resource.class.collection?
+        placeholder.values[placeholder.resource.class.collection_member.name]
+      else
+        placeholders[[placeholder.resource.class, placeholder.resource.id]] = placeholder
+        placeholder.resource.class.members.values.grep(OmniSerializer::Resource::Association).flat_map do |association|
+          Array.wrap(placeholder.values[association.name])
+        end
       end
+
+      queue.concat(enqueue.reject do |item|
+        !item.resource.class.collection? && placeholders[[item.resource.class, item.resource.id]]
+      end)
     end
+
+    placeholders
   end
 
   def top_level_linkage(value)

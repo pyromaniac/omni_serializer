@@ -267,6 +267,102 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
       end
     end
 
+    context 'when include is recursive' do
+      let(:resource) { CategoryResource }
+      let(:options) { { include: 'parent,children,posts' } }
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: CategoryResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :category_name, arguments: {}, schema: nil },
+            { name: :parent, arguments: {}, schema: {
+              resource: CategoryResource,
+              members: [
+                { name: :id, arguments: {}, schema: nil },
+                { name: :category_name, arguments: {}, schema: nil },
+                { name: :parent, arguments: {}, schema: {
+                  resource: CategoryResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :category_name, arguments: {}, schema: nil }
+                  ]
+                } },
+                { name: :children, arguments: {}, schema: {
+                  resource: CategoryResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :category_name, arguments: {}, schema: nil }
+                  ]
+                } },
+                { name: :posts, arguments: {}, schema: {
+                  resource: PostCollectionResource,
+                  members: [
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: PostResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :post_title, arguments: {}, schema: nil },
+                        { name: :post_content, arguments: {}, schema: nil }
+                      ]
+                    } }
+                  ]
+                } }
+              ]
+            } },
+            { name: :children, arguments: {}, schema: {
+              resource: CategoryResource,
+              members: [
+                { name: :id, arguments: {}, schema: nil },
+                { name: :category_name, arguments: {}, schema: nil },
+                { name: :parent, arguments: {}, schema: {
+                  resource: CategoryResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :category_name, arguments: {}, schema: nil }
+                  ]
+                } },
+                { name: :children, arguments: {}, schema: {
+                  resource: CategoryResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :category_name, arguments: {}, schema: nil }
+                  ]
+                } },
+                { name: :posts, arguments: {}, schema: {
+                  resource: PostCollectionResource,
+                  members: [
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: PostResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :post_title, arguments: {}, schema: nil },
+                        { name: :post_content, arguments: {}, schema: nil }
+                      ]
+                    } }
+                  ]
+                } }
+              ]
+            } },
+            { name: :posts, arguments: {}, schema: {
+              resource: PostCollectionResource,
+              members: [
+                { name: :to_a, arguments: {}, schema: {
+                  resource: PostResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :post_title, arguments: {}, schema: nil },
+                    { name: :post_content, arguments: {}, schema: nil }
+                  ]
+                } }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
     context 'when include is circular' do
       let(:resource) { TagResource }
       let(:options) { { include: 'taggables.tags,taggables:comments.comment-author' } }

@@ -6,12 +6,18 @@ ActiveRecord::Base.logger = Logger.new(File::NULL)
 ActiveRecord::Schema.define do
   create_table :posts do |t|
     t.column :user_id, :integer
+    t.column :category_id, :integer
     t.column :title, :string
     t.column :content, :jsonb
   end
 
   create_table :users do |t|
     t.column :name, :string
+  end
+
+  create_table :categories do |t|
+    t.column :name, :string
+    t.column :parent_id, :integer
   end
 
   create_table :comments do |t|

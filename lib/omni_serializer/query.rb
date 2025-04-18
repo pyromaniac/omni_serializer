@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
-# @example
 class OmniSerializer::Query < Dry::Struct
+  include OmniSerializer::Inspect.new(:name, :arguments, :schema)
+
   class ResourceSchema < Dry::Struct
+    include OmniSerializer::Inspect.new(:resource, :members)
+
     attribute :resource, OmniSerializer::Types::Resource
     attribute :members, OmniSerializer::Types::Array.of(OmniSerializer::Query)
   end

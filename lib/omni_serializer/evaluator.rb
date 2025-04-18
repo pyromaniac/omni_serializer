@@ -4,6 +4,8 @@ class OmniSerializer::Evaluator
   extend Dry::Initializer
 
   class Placeholder < Dry::Struct
+    include OmniSerializer::Inspect.new(:resource, :values)
+
     attribute :resource, OmniSerializer::Types::Any.optional
     attribute :values, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
   end

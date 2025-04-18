@@ -2,6 +2,7 @@
 
 class Post < ActiveRecord::Base
   belongs_to :user
+  belongs_to :category, optional: true
   has_many :comments
   has_many :taggings, as: :taggable
   has_many :tags, through: :taggings
@@ -10,6 +11,12 @@ end
 class User < ActiveRecord::Base
   has_many :posts
   has_many :comments
+end
+
+class Category < ActiveRecord::Base
+  belongs_to :parent, class_name: 'Category', optional: true
+  has_many :children, class_name: 'Category', foreign_key: :parent_id
+  has_many :posts
 end
 
 class Comment < ActiveRecord::Base
