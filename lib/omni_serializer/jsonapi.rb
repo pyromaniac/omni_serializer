@@ -7,11 +7,8 @@ class OmniSerializer::Jsonapi
 
   option :query_builder, OmniSerializer::Types::Interface(:call)
   option :evaluator, OmniSerializer::Types::Interface(:call)
-
-  option :inflector, OmniSerializer::Types::Interface(:underscore, :dasherize, :camelize, :singularize, :pluralize)
-  option :key_transform, OmniSerializer::Types::Transform.optional, default: proc {}
-  option :type_transform, OmniSerializer::Types::Transform, default: proc {}
-  option :type_number, OmniSerializer::Types::Symbol.enum(:singular, :plural), default: proc { :plural }
+  option :key_formatter, OmniSerializer::Types::Interface(:call)
+  option :type_formatter, OmniSerializer::Types::Interface(:call)
 
   def serialize(value, with:, context: {}, params: {})
     query = query_builder.call(with, **params)
@@ -84,11 +81,11 @@ class OmniSerializer::Jsonapi
 
     data = {
       id: placeholder.resource.id,
-      type: transform_type(placeholder.resource.class.type),
-      attributes: placeholder.values.slice(*attribute_names).transform_keys { |key| transform_key(key) },
+      type: type_formatter.call(placeholder.resource.class.type),
+      attributes: placeholder.values.slice(*attribute_names).transform_keys { |key| key_formatter.call(key) },
       relationships: render_relationships(placeholder)
     }
-    meta = placeholder.values.slice(*meta_names).transform_keys { |key| transform_key(key) }
+    meta = placeholder.values.slice(*meta_names).transform_keys { |key| key_formatter.call(key) }
     data[:meta] = meta unless meta.empty?
     data
   end
@@ -103,7 +100,7 @@ class OmniSerializer::Jsonapi
         {}
       end
 
-      [transform_key(name), relationship]
+      [key_formatter.call(name), relationship]
     end
   end
 
@@ -115,33 +112,7 @@ class OmniSerializer::Jsonapi
     elsif value.resource.class.collection?
       value.values[value.resource.class.collection_member.name].map { |item| relationship_data(item, association) }
     else
-      { id: value.resource.id, type: transform_type(value.resource.class.type) }
-    end
-  end
-
-  def transform_type(type)
-    type = case type_number
-    when :singular
-      inflector.singularize(type.to_s)
-    when :plural
-      inflector.pluralize(type.to_s)
-    end
-
-    transform_key(type, type_transform)
-  end
-
-  def transform_key(key, transform = key_transform)
-    case transform
-    when :camel
-      inflector.camelize(key)
-    when :camel_lower
-      inflector.respond_to?(:camelize_lower) ? inflector.camelize_lower(key) : inflector.camelize(key, false)
-    when :dash
-      inflector.dasherize(key)
-    when :underscore
-      inflector.underscore(key)
-    else
-      key.to_s
+      { id: value.resource.id, type: type_formatter.call(value.resource.class.type) }
     end
   end
 end

@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
-  subject(:params_normalizer) { described_class.new(inflector:, key_transform:, type_transform:, type_number:) }
+  subject(:params_normalizer) { described_class.new(key_formatter:, type_formatter:) }
 
-  let(:inflector) { Dry::Inflector.new }
-  let(:key_transform) { :dash }
-  let(:type_transform) { :dash }
-  let(:type_number) { :plural }
+  let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
+  let(:key_formatter_options) { { casing: :kebab } }
+  let(:type_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **type_formatter_options) }
+  let(:type_formatter_options) { { casing: :kebab, number: :plural } }
 
   describe '#call' do
     subject(:query) { params_normalizer.call(resource, **options) }

@@ -7,5 +7,4 @@ module OmniSerializer::Types
   include Dry::Types()
 
   Resource = Class.constrained(respond_to: :members)
-  Transform = Symbol.enum(:camel, :camel_lower, :dash, :underscore).optional
 end

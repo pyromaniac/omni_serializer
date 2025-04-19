@@ -6,8 +6,7 @@ class OmniSerializer::Simple
 
   option :query_builder, OmniSerializer::Types::Interface(:call)
   option :evaluator, OmniSerializer::Types::Interface(:call)
-  option :inflector, OmniSerializer::Types::Interface(:underscore, :dasherize, :camelize, :singularize, :pluralize)
-  option :key_transform, OmniSerializer::Types::Transform.optional, default: proc {}
+  option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :root, OmniSerializer::Types::Bool, default: proc { false }
 
   # @param value [Object, Array<Object>] The object to serialize.
@@ -40,30 +39,15 @@ class OmniSerializer::Simple
     if collection_member && placeholder.values.keys == [collection_member.name]
       traverse_result(placeholder.values[collection_member.name])
     else
-      traverse_result(placeholder.values).transform_keys { |key| transform_key(key) }
-    end
-  end
-
-  def transform_key(key)
-    case key_transform
-    when :camel
-      inflector.camelize(key)
-    when :camel_lower
-      inflector.respond_to?(:camelize_lower) ? inflector.camelize_lower(key) : camelize(key, false)
-    when :dash
-      inflector.dasherize(key)
-    when :underscore
-      inflector.underscore(key)
-    else
-      key.to_s
+      traverse_result(placeholder.values).transform_keys { |key| key_formatter.call(key) }
     end
   end
 
   def with_root(result, resource)
     if result.is_a?(Array)
-      { inflector.pluralize(transform_key(resource.type)) => result }
+      { key_formatter.call(resource.type, :plural) => result }
     else
-      { inflector.singularize(transform_key(resource.type)) => result }
+      { key_formatter.call(resource.type, :singular) => result }
     end
   end
 end

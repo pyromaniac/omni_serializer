@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Simple do
-  subject(:serializer) { described_class.new(query_builder:, evaluator:, inflector:, **options) }
+  subject(:serializer) { described_class.new(query_builder:, evaluator:, key_formatter:, **options) }
 
+  let(:options) { {} }
   let(:query_builder) { OmniSerializer::Simple::QueryBuilder.new }
   let(:evaluator) { OmniSerializer::Evaluator.new(loaders:) }
-  let(:inflector) { Dry::Inflector.new }
   let(:loaders) { {} }
-  let(:options) { {} }
+  let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
+  let(:key_formatter_options) { {} }
 
   describe '#serialize' do
     let!(:post1) { Post.create!(title: 'Post 1', content: { foo: 42 }) }
@@ -50,7 +51,7 @@ RSpec.describe OmniSerializer::Simple do
     end
 
     context 'with collection serializer defined' do
-      let(:options) { { key_transform: :camel_lower } }
+      let(:key_formatter_options) { { casing: :camel } }
 
       specify do
         expect(serializer.serialize(comment1, with: CommentResource, only: [],
@@ -73,7 +74,7 @@ RSpec.describe OmniSerializer::Simple do
     end
 
     context 'with polymorphic association' do
-      let(:options) { { key_transform: :dash } }
+      let(:key_formatter_options) { { casing: :kebab } }
 
       specify do
         expect(serializer.serialize(Tagging.all, with: TaggingResource,
@@ -88,7 +89,8 @@ RSpec.describe OmniSerializer::Simple do
     end
 
     context 'with root: true' do
-      let(:options) { { root: true, key_transform: :camel } }
+      let(:options) { { root: true } }
+      let(:key_formatter_options) { { casing: :pascal } }
 
       specify do
         expect(serializer.serialize(post1, with: PostResource))

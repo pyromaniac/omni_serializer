@@ -5,11 +5,8 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
   DEFAULT_ATTRIBUTES = %i[id].freeze
 
-  option :inflector, OmniSerializer::Types::Interface(:underscore, :dasherize, :camelize, :singularize, :pluralize)
-  option :key_transform, OmniSerializer::Types::Transform, default: proc {}
-  option :type_transform, OmniSerializer::Types::Transform, default: proc {}
-  option :type_number, OmniSerializer::Types::Symbol.enum(:singular, :plural), default: proc { :plural }
-
+  option :key_formatter, OmniSerializer::Types::Interface(:call)
+  option :type_formatter, OmniSerializer::Types::Interface(:call)
   option :type_extractor, OmniSerializer::Types::Interface(:call), default: proc { ->(name) { name.split(':', 2) } }
 
   def call(resource_class, include: {}, fields: {}, filter: {}, sort: [], **_query_options)
@@ -47,7 +44,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
       }
     end
 
-    transformed_members = resource_class.members.values.index_by { |member| transform_key(member.name) }
+    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
 
     includes_tree.flat_map do |name, nested_includes|
       name, type = type_extractor.call(name)
@@ -58,9 +55,9 @@ class OmniSerializer::Jsonapi::QueryBuilder
       end
 
       association_types = if association.resource_class.is_a?(Hash)
-        association.resource_class.values.index_by { |resource_class| transform_type(resource_class.type) }
+        association.resource_class.values.index_by { |resource_class| type_formatter.call(resource_class.type) }
       else
-        { transform_type(association.resource_class.type) => association.resource_class }
+        { type_formatter.call(association.resource_class.type) => association.resource_class }
       end
 
       if type
@@ -86,7 +83,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
   end
 
   def normalize_fields(fields, includes_map:)
-    type_map = includes_map.keys.index_by { |resource_class| transform_type(resource_class.type) }
+    type_map = includes_map.keys.index_by { |resource_class| type_formatter.call(resource_class.type) }
 
     raise OmniSerializer::Error, '`fields` parameter must be an mapping' unless fields.is_a?(Hash)
 
@@ -96,7 +93,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
       raise OmniSerializer::UndefinedQueryType.new(type, type_map.keys) unless resource_class
 
-      members_map = resource_class.members.values.index_by { |member| transform_key(member.name) }
+      members_map = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
       members = fields.filter_map do |field|
         member = members_map[field.to_s]
 
@@ -122,7 +119,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
   def normalize_filter_tree(resource_class, filter_tree, includes_map:)
     resource_class = resource_class.collection_member.resource_class if resource_class.collection?
-    transformed_members = resource_class.members.values.index_by { |member| transform_key(member.name) }
+    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
 
     filter_tree.flat_map do |name, nested_tree|
       name, type = type_extractor.call(name.to_s)
@@ -131,9 +128,9 @@ class OmniSerializer::Jsonapi::QueryBuilder
       case member
       when OmniSerializer::Resource::Association
         association_types = if member.resource_class.is_a?(Hash)
-          member.resource_class.values.index_by { |resource_class| transform_type(resource_class.type) }
+          member.resource_class.values.index_by { |resource_class| type_formatter.call(resource_class.type) }
         else
-          { transform_type(member.resource_class.type) => member.resource_class }
+          { type_formatter.call(member.resource_class.type) => member.resource_class }
         end
 
         if type && !association_types[type]
@@ -215,7 +212,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
   #     resource = root_resource
   #     resource_chain = []
   #     path.each.with_index do |segment, index|
-  #       member = resource_members(resource)[transform_key(segment)]
+  #       member = resource_members(resource)[key_formatter.call(segment)]
   #       if member.is_a?(OmniSerializer::Resource::Association)
   #         resource = member.resource_class
   #         resource_chain.push(member.name)
@@ -226,30 +223,4 @@ class OmniSerializer::Jsonapi::QueryBuilder
   #     end
   #   end
   # end
-
-  def transform_type(type)
-    type = case type_number
-    when :singular
-      inflector.singularize(type)
-    when :plural
-      inflector.pluralize(type)
-    end
-
-    transform_key(type, type_transform)
-  end
-
-  def transform_key(key, transform = key_transform)
-    case transform
-    when :camel
-      inflector.camelize(key)
-    when :camel_lower
-      inflector.respond_to?(:camelize_lower) ? inflector.camelize_lower(key) : inflector.camelize(key, false)
-    when :dash
-      inflector.dasherize(key)
-    when :underscore
-      inflector.underscore(key)
-    else
-      key.to_s
-    end
-  end
 end

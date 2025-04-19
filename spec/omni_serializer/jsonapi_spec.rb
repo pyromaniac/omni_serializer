@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Jsonapi do
-  subject(:serializer) { described_class.new(query_builder:, evaluator:, inflector:, **options) }
+  subject(:serializer) { described_class.new(query_builder:, evaluator:, key_formatter:, type_formatter:) }
 
-  let(:query_builder) { OmniSerializer::Jsonapi::QueryBuilder.new(inflector:, **options) }
+  let(:query_builder) { OmniSerializer::Jsonapi::QueryBuilder.new(key_formatter:, type_formatter:) }
+  let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
+  let(:key_formatter_options) { { casing: :snake } }
+  let(:type_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **type_formatter_options) }
+  let(:type_formatter_options) { { casing: :snake, number: :plural } }
   let(:evaluator) { OmniSerializer::Evaluator.new(loaders:) }
-  let(:inflector) { Dry::Inflector.new }
   let(:loaders) { {} }
-  let(:options) { {} }
 
   describe '#serialize' do
     let!(:post1) { Post.create!(title: 'Post 1', content: { foo: 42 }) }
@@ -123,7 +125,8 @@ RSpec.describe OmniSerializer::Jsonapi do
     end
 
     context 'with recursive includes' do
-      let(:options) { { key_transform: :dash, type_transform: :camel } }
+      let(:key_formatter_options) { { casing: :kebab } }
+      let(:type_formatter_options) { { casing: :pascal, number: :plural } }
 
       let!(:category1) { Category.create!(name: 'Category 1', parent: nil) }
       let!(:category2) { Category.create!(name: 'Category 2', parent: nil) }
@@ -223,7 +226,8 @@ RSpec.describe OmniSerializer::Jsonapi do
     end
 
     context 'with polymorphic association' do
-      let(:options) { { key_transform: :camel_lower, type_number: :singular } }
+      let(:key_formatter_options) { { casing: :camel } }
+      let(:type_formatter_options) { { casing: :camel, number: :singular } }
 
       let!(:tag1) { Tag.create!(name: 'Tag 1', posts: [post1, post2]) }
       let!(:tag2) { Tag.create!(name: 'Tag 2', posts: [post1], comments: [comment1, comment2]) }
