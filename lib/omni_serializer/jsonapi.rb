@@ -80,7 +80,7 @@ class OmniSerializer::Jsonapi
     meta_names = members.select { |member| member.macro == :meta }.map(&:name)
 
     data = {
-      id: placeholder.resource.id,
+      id: placeholder.resource.id.to_s,
       type: type_formatter.call(placeholder.resource.class.type),
       attributes: placeholder.values.slice(*attribute_names).transform_keys { |key| key_formatter.call(key) },
       relationships: render_relationships(placeholder)
@@ -112,7 +112,7 @@ class OmniSerializer::Jsonapi
     elsif value.resource.class.collection?
       value.values[value.resource.class.collection_member.name].map { |item| relationship_data(item, association) }
     else
-      { id: value.resource.id, type: type_formatter.call(value.resource.class.type) }
+      { id: value.resource.id.to_s, type: type_formatter.call(value.resource.class.type) }
     end
   end
 end

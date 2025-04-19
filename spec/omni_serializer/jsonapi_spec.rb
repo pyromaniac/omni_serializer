@@ -22,7 +22,7 @@ RSpec.describe OmniSerializer::Jsonapi do
 
     specify do
       expect(serializer.serialize(post1, with: PostResource)).to eq({ data: {
-        id: post1.id,
+        id: post1.id.to_s,
         type: 'posts',
         attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
         relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
@@ -33,43 +33,46 @@ RSpec.describe OmniSerializer::Jsonapi do
         params: { include: 'post_author,comments' }
       )).to eq({
         data: [{
-          id: post1.id,
+          id: post1.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
           relationships: {
-            'post_author' => { data: { id: user1.id, type: 'users' } },
-            'comments' => { data: [{ id: comment1.id, type: 'comments' }, { id: comment2.id, type: 'comments' }] },
+            'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
+            'comments' => { data: [
+              { id: comment1.id.to_s, type: 'comments' },
+              { id: comment2.id.to_s, type: 'comments' }
+            ] },
             'taggings' => {},
             'tags' => {}
           }
         }, {
-          id: post2.id,
+          id: post2.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 2', 'post_content' => ['foo', 42] },
           relationships: {
-            'post_author' => { data: { id: user1.id, type: 'users' } },
-            'comments' => { data: [{ id: comment3.id, type: 'comments' }] },
+            'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
+            'comments' => { data: [{ id: comment3.id.to_s, type: 'comments' }] },
             'taggings' => {},
             'tags' => {}
           }
         }],
         included: [{
-          id: user1.id,
+          id: user1.id.to_s,
           type: 'users',
           attributes: { 'user_name' => 'User 1' },
           relationships: { 'comments' => {}, 'posts' => {} }
         }, {
-          id: comment1.id,
+          id: comment1.id.to_s,
           type: 'comments',
           attributes: { 'comment_body' => 'Comment 1' },
           relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
         }, {
-          id: comment2.id,
+          id: comment2.id.to_s,
           type: 'comments',
           attributes: { 'comment_body' => 'Comment 2' },
           relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
         }, {
-          id: comment3.id,
+          id: comment3.id.to_s,
           type: 'comments',
           attributes: { 'comment_body' => 'Comment 3' },
           relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
@@ -77,17 +80,17 @@ RSpec.describe OmniSerializer::Jsonapi do
       })
       expect(serializer.serialize(Post.all.order(:title), with: PostResource,
         params: { fields: { posts: 'post_title' } })).to eq({ data: [{
-          id: post1.id,
+          id: post1.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 1' },
           relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
         }, {
-          id: post2.id,
+          id: post2.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 2' },
           relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
         }, {
-          id: post3.id,
+          id: post3.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 3' },
           relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
@@ -96,28 +99,28 @@ RSpec.describe OmniSerializer::Jsonapi do
 
     specify do
       expect(serializer.serialize([comment1, comment2], with: CommentCollectionResource)).to eq({ data: [{
-        id: comment1.id,
+        id: comment1.id.to_s,
         type: 'comments',
         attributes: { 'comment_body' => 'Comment 1' },
         relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
       }, {
-        id: comment2.id,
+        id: comment2.id.to_s,
         type: 'comments',
         attributes: { 'comment_body' => 'Comment 2' },
         relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
       }] })
       expect(serializer.serialize(Comment.all.order(:body), with: CommentCollectionResource)).to eq({ data: [{
-        id: comment1.id,
+        id: comment1.id.to_s,
         type: 'comments',
         attributes: { 'comment_body' => 'Comment 1' },
         relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
       }, {
-        id: comment2.id,
+        id: comment2.id.to_s,
         type: 'comments',
         attributes: { 'comment_body' => 'Comment 2' },
         relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
       }, {
-        id: comment3.id,
+        id: comment3.id.to_s,
         type: 'comments',
         attributes: { 'comment_body' => 'Comment 3' },
         relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
@@ -148,56 +151,56 @@ RSpec.describe OmniSerializer::Jsonapi do
           params: { include: 'parent,children,posts' }
         )).to eq({
           data: [{
-            id: category1.id,
+            id: category1.id.to_s,
             type: 'Categories',
             attributes: { 'category-name' => 'Category 1' },
             relationships: {
               'parent' => { data: nil },
-              'children' => { data: [{ id: category3.id, type: 'Categories' }] },
-              'posts' => { data: [{ id: post1.id, type: 'Posts' }] }
+              'children' => { data: [{ id: category3.id.to_s, type: 'Categories' }] },
+              'posts' => { data: [{ id: post1.id.to_s, type: 'Posts' }] }
             }
           }, {
-            id: category2.id,
+            id: category2.id.to_s,
             type: 'Categories',
             attributes: { 'category-name' => 'Category 2' },
             relationships: {
               'parent' => { data: nil },
               'children' => { data: [
-                { id: category4.id, type: 'Categories' },
-                { id: category5.id, type: 'Categories' }
+                { id: category4.id.to_s, type: 'Categories' },
+                { id: category5.id.to_s, type: 'Categories' }
               ] },
               'posts' => { data: [] }
             }
           }],
           included: [{
-            id: category3.id,
+            id: category3.id.to_s,
             type: 'Categories',
             attributes: { 'category-name' => 'Category 3' },
             relationships: {
-              'parent' => { data: { id: category1.id, type: 'Categories' } },
-              'children' => { data: [{ id: category6.id, type: 'Categories' }] },
-              'posts' => { data: [{ id: post2.id, type: 'Posts' }] }
+              'parent' => { data: { id: category1.id.to_s, type: 'Categories' } },
+              'children' => { data: [{ id: category6.id.to_s, type: 'Categories' }] },
+              'posts' => { data: [{ id: post2.id.to_s, type: 'Posts' }] }
             }
           }, {
-            id: category4.id,
+            id: category4.id.to_s,
             type: 'Categories',
             attributes: { 'category-name' => 'Category 4' },
             relationships: {
-              'parent' => { data: { id: category2.id, type: 'Categories' } },
+              'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
               'posts' => { data: [] }
             }
           }, {
-            id: category5.id,
+            id: category5.id.to_s,
             type: 'Categories',
             attributes: { 'category-name' => 'Category 5' },
             relationships: {
-              'parent' => { data: { id: category2.id, type: 'Categories' } },
+              'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
-              'posts' => { data: [{ id: post3.id, type: 'Posts' }] }
+              'posts' => { data: [{ id: post3.id.to_s, type: 'Posts' }] }
             }
           }, {
-            id: category6.id,
+            id: category6.id.to_s,
             type: 'Categories',
             attributes: { 'category-name' => 'Category 6' },
             relationships: {
@@ -206,17 +209,17 @@ RSpec.describe OmniSerializer::Jsonapi do
               'posts' => {}
             }
           }, {
-            id: post1.id,
+            id: post1.id.to_s,
             type: 'Posts',
             attributes: { 'post-title' => 'Post 1', 'post-content' => { 'foo' => 42 } },
             relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
           }, {
-            id: post2.id,
+            id: post2.id.to_s,
             type: 'Posts',
             attributes: { 'post-title' => 'Post 2', 'post-content' => ['foo', 42] },
             relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
           }, {
-            id: post3.id,
+            id: post3.id.to_s,
             type: 'Posts',
             attributes: { 'post-title' => 'Post 3', 'post-content' => nil },
             relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
@@ -240,88 +243,88 @@ RSpec.describe OmniSerializer::Jsonapi do
             fields: { post: 'postTitle', comment: 'commentBody' }
           })).to match({
             data: [{
-              id: an_instance_of(Integer),
+              id: an_instance_of(String),
               type: 'tagging',
               attributes: {},
               relationships: {
-                'tag' => { data: { id: tag1.id, type: 'tag' } },
-                'taggable' => { data: { id: post1.id, type: 'post' } }
+                'tag' => { data: { id: tag1.id.to_s, type: 'tag' } },
+                'taggable' => { data: { id: post1.id.to_s, type: 'post' } }
               }
             }, {
-              id: an_instance_of(Integer),
+              id: an_instance_of(String),
               type: 'tagging',
               attributes: {},
               relationships: {
-                'tag' => { data: { id: tag1.id, type: 'tag' } },
-                'taggable' => { data: { id: post2.id, type: 'post' } }
+                'tag' => { data: { id: tag1.id.to_s, type: 'tag' } },
+                'taggable' => { data: { id: post2.id.to_s, type: 'post' } }
               }
             }, {
-              id: an_instance_of(Integer),
+              id: an_instance_of(String),
               type: 'tagging',
               attributes: {},
               relationships: {
-                'tag' => { data: { id: tag2.id, type: 'tag' } },
-                'taggable' => { data: { id: post1.id, type: 'post' } }
+                'tag' => { data: { id: tag2.id.to_s, type: 'tag' } },
+                'taggable' => { data: { id: post1.id.to_s, type: 'post' } }
               }
             }, {
-              id: an_instance_of(Integer),
+              id: an_instance_of(String),
               type: 'tagging',
               attributes: {},
               relationships: {
-                'tag' => { data: { id: tag2.id, type: 'tag' } },
-                'taggable' => { data: { id: comment1.id, type: 'comment' } }
+                'tag' => { data: { id: tag2.id.to_s, type: 'tag' } },
+                'taggable' => { data: { id: comment1.id.to_s, type: 'comment' } }
               }
             }, {
-              id: an_instance_of(Integer),
+              id: an_instance_of(String),
               type: 'tagging',
               attributes: {},
               relationships: {
-                'tag' => { data: { id: tag2.id, type: 'tag' } },
-                'taggable' => { data: { id: comment2.id, type: 'comment' } }
+                'tag' => { data: { id: tag2.id.to_s, type: 'tag' } },
+                'taggable' => { data: { id: comment2.id.to_s, type: 'comment' } }
               }
             }],
             included: [{
-              id: tag1.id,
+              id: tag1.id.to_s,
               type: 'tag',
               attributes: { 'tagName' => 'Tag 1' },
               relationships: { 'tagging' => {}, 'taggables' => {} }
             }, {
-              id: post1.id,
+              id: post1.id.to_s,
               type: 'post',
               attributes: { 'postTitle' => 'Post 1' },
               relationships: {
-                'postAuthor' => { data: { id: user1.id, type: 'user' } },
+                'postAuthor' => { data: { id: user1.id.to_s, type: 'user' } },
                 'comments' => {},
                 'taggings' => {},
                 'tags' => {}
               }
             }, {
-              id: post2.id,
+              id: post2.id.to_s,
               type: 'post',
               attributes: { 'postTitle' => 'Post 2' },
               relationships: {
-                'postAuthor' => { data: { id: user1.id, type: 'user' } },
+                'postAuthor' => { data: { id: user1.id.to_s, type: 'user' } },
                 'comments' => {},
                 'taggings' => {},
                 'tags' => {}
               }
             }, {
-              id: tag2.id,
+              id: tag2.id.to_s,
               type: 'tag',
               attributes: { 'tagName' => 'Tag 2' },
               relationships: { 'tagging' => {}, 'taggables' => {} }
             }, {
-              id: comment1.id,
+              id: comment1.id.to_s,
               type: 'comment',
               attributes: { 'commentBody' => 'Comment 1' },
               relationships: { 'commentAuthor' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
             }, {
-              id: comment2.id,
+              id: comment2.id.to_s,
               type: 'comment',
               attributes: { 'commentBody' => 'Comment 2' },
               relationships: { 'commentAuthor' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
             }, {
-              id: 1,
+              id: user1.id.to_s,
               type: 'user',
               attributes: { 'userName' => 'User 1' },
               relationships: { 'comments' => {}, 'posts' => {} }
