@@ -3,7 +3,7 @@
 RSpec.describe OmniSerializer::Jsonapi do
   subject(:serializer) { described_class.new(query_builder:, evaluator:, inflector:, **options) }
 
-  let(:query_builder) { OmniSerializer::Jsonapi::QueryBuilder.new(inflector:) }
+  let(:query_builder) { OmniSerializer::Jsonapi::QueryBuilder.new(inflector:, **options) }
   let(:evaluator) { OmniSerializer::Evaluator.new(loaders:) }
   let(:inflector) { Dry::Inflector.new }
   let(:loaders) { {} }
@@ -222,22 +222,108 @@ RSpec.describe OmniSerializer::Jsonapi do
       end
     end
 
-    # context 'with polymorphic association' do
-    #   let(:options) { { key_transform: :camel_lower } }
+    context 'with polymorphic association' do
+      let(:options) { { key_transform: :camel_lower, type_number: :singular } }
 
-    #   let!(:tag1) { Tag.create!(name: 'Tag 1', posts: [post1, post2]) }
-    #   let!(:tag2) { Tag.create!(name: 'Tag 2', posts: [post1], comments: [comment1, comment2]) }
+      let!(:tag1) { Tag.create!(name: 'Tag 1', posts: [post1, post2]) }
+      let!(:tag2) { Tag.create!(name: 'Tag 2', posts: [post1], comments: [comment1, comment2]) }
 
-    #   specify do
-    #     expect(serializer.serialize(Tagging.all, with: TaggingResource,
-    #       include: [:tag, { taggable: { only: %i[post_title comment_body] } }])).to eq([
-    #         { 'tag' => { 'name' => 'Tag 1' }, 'taggable' => { 'post-title' => 'Post 1' } },
-    #         { 'tag' => { 'name' => 'Tag 1' }, 'taggable' => { 'post-title' => 'Post 2' } },
-    #         { 'tag' => { 'name' => 'Tag 2' }, 'taggable' => { 'post-title' => 'Post 1' } },
-    #         { 'tag' => { 'name' => 'Tag 2' }, 'taggable' => { 'comment-body' => 'Comment 1' } },
-    #         { 'tag' => { 'name' => 'Tag 2' }, 'taggable' => { 'comment-body' => 'Comment 2' } }
-    #       ])
-    #   end
-    # end
+      specify do
+        expect(serializer.serialize(Tagging.order(:id),
+          with: TaggingResource,
+          params: {
+            include: 'tag,taggable:post.postAuthor',
+            fields: { post: 'postTitle', comment: 'commentBody' }
+          })).to match({
+            data: [{
+              id: an_instance_of(Integer),
+              type: 'tagging',
+              attributes: {},
+              relationships: {
+                'tag' => { data: { id: tag1.id, type: 'tag' } },
+                'taggable' => { data: { id: post1.id, type: 'post' } }
+              }
+            }, {
+              id: an_instance_of(Integer),
+              type: 'tagging',
+              attributes: {},
+              relationships: {
+                'tag' => { data: { id: tag1.id, type: 'tag' } },
+                'taggable' => { data: { id: post2.id, type: 'post' } }
+              }
+            }, {
+              id: an_instance_of(Integer),
+              type: 'tagging',
+              attributes: {},
+              relationships: {
+                'tag' => { data: { id: tag2.id, type: 'tag' } },
+                'taggable' => { data: { id: post1.id, type: 'post' } }
+              }
+            }, {
+              id: an_instance_of(Integer),
+              type: 'tagging',
+              attributes: {},
+              relationships: {
+                'tag' => { data: { id: tag2.id, type: 'tag' } },
+                'taggable' => { data: { id: comment1.id, type: 'comment' } }
+              }
+            }, {
+              id: an_instance_of(Integer),
+              type: 'tagging',
+              attributes: {},
+              relationships: {
+                'tag' => { data: { id: tag2.id, type: 'tag' } },
+                'taggable' => { data: { id: comment2.id, type: 'comment' } }
+              }
+            }],
+            included: [{
+              id: tag1.id,
+              type: 'tag',
+              attributes: { 'tagName' => 'Tag 1' },
+              relationships: { 'tagging' => {}, 'taggables' => {} }
+            }, {
+              id: post1.id,
+              type: 'post',
+              attributes: { 'postTitle' => 'Post 1' },
+              relationships: {
+                'postAuthor' => { data: { id: user1.id, type: 'user' } },
+                'comments' => {},
+                'taggings' => {},
+                'tags' => {}
+              }
+            }, {
+              id: post2.id,
+              type: 'post',
+              attributes: { 'postTitle' => 'Post 2' },
+              relationships: {
+                'postAuthor' => { data: { id: user1.id, type: 'user' } },
+                'comments' => {},
+                'taggings' => {},
+                'tags' => {}
+              }
+            }, {
+              id: tag2.id,
+              type: 'tag',
+              attributes: { 'tagName' => 'Tag 2' },
+              relationships: { 'tagging' => {}, 'taggables' => {} }
+            }, {
+              id: comment1.id,
+              type: 'comment',
+              attributes: { 'commentBody' => 'Comment 1' },
+              relationships: { 'commentAuthor' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+            }, {
+              id: comment2.id,
+              type: 'comment',
+              attributes: { 'commentBody' => 'Comment 2' },
+              relationships: { 'commentAuthor' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+            }, {
+              id: 1,
+              type: 'user',
+              attributes: { 'userName' => 'User 1' },
+              relationships: { 'comments' => {}, 'posts' => {} }
+            }]
+          })
+      end
+    end
   end
 end

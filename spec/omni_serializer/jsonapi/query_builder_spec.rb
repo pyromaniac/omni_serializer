@@ -601,16 +601,20 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                   { name: :id, arguments: {}, schema: nil },
                   { name: :post_title, arguments: {}, schema: nil },
                   { name: :post_content, arguments: {}, schema: nil },
-                  { name: :comments, arguments: { filter: { comment_body: ['hello', {}], 'non-member' => 'value' } }, schema: {
-                    resource: CommentCollectionResource,
-                    members: [{ name: :to_a, arguments: {}, schema: {
-                      resource: CommentResource,
-                      members: [
-                        { name: :id, arguments: {}, schema: nil },
-                        { name: :comment_body, arguments: {}, schema: nil }
-                      ]
-                    } }]
-                  } }
+                  {
+                    name: :comments,
+                    arguments: { filter: { comment_body: ['hello', {}], 'non-member' => 'value' } },
+                    schema: {
+                      resource: CommentCollectionResource,
+                      members: [{ name: :to_a, arguments: {}, schema: {
+                        resource: CommentResource,
+                        members: [
+                          { name: :id, arguments: {}, schema: nil },
+                          { name: :comment_body, arguments: {}, schema: nil }
+                        ]
+                      } }]
+                    }
+                  }
                 ]
               } }]
             } },
