@@ -11,10 +11,11 @@ class OmniSerializer::Simple
 
   # @param value [Object, Array<Object>] The object to serialize.
   # @param with [Class] The resource class to use for serialization.
+  # @param params [Hash] The params to use for serialization.
   # @param context [Hash] The context to use for serialization.
   # @return [Hash] The serialized object.
-  def serialize(value, with:, context: {}, **query_options)
-    query = query_builder.call(with, **query_options)
+  def serialize(value, with:, params: {}, context: {})
+    query = query_builder.call(with, **params)
     result = traverse_result(evaluator.call(value, query, context:))
     root ? with_root(result, with) : result
   end

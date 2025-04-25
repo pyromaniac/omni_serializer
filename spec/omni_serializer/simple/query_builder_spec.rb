@@ -51,7 +51,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
           only: %i[post_title tags],
           except: :invalid,
           extra: :comments_count,
-          params: { foo: 42 },
+          arguments: { foo: 42 },
           include: %i[post_author comments]
         }
       end
@@ -89,7 +89,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
     context 'when include: is given' do
       let(:resource) { CommentResource }
       let(:options) do
-        { include: { post: { only: { post_title: { bar: 43 } }, include: :post_author, params: { foo: 42 } } } }
+        { include: { post: { only: { post_title: { bar: 43 } }, include: :post_author, arguments: { foo: 42 } } } }
       end
 
       specify do
@@ -119,7 +119,12 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
     context 'with collection resource' do
       let(:resource) { CommentCollectionResource }
       let(:options) do
-        { include: { post: { only: :post_title, include: :post_author, params: { foo: 42 } } }, params: { bar: 43 } }
+        {
+          include: {
+            post: { only: :post_title, include: :post_author, arguments: { foo: 42 } }
+          },
+          arguments: { bar: 43 }
+        }
       end
 
       specify do
@@ -160,7 +165,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
               collection: { extra: [:total_count] },
               only: [:id, { comment_body: { bar: 43 } }],
               include: { comment_author: { except: :user_name } },
-              params: { foo: 42 }
+              arguments: { foo: 42 }
             }
           }
         }
@@ -250,7 +255,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
       let(:resource) { TagResource }
       let(:options) do
         {
-          include: { taggables: { params: { foo: 42 }, types: { PostResource => { include: :tags } }, except: :id } }
+          include: { taggables: { arguments: { foo: 42 }, types: { PostResource => { include: :tags } }, except: :id } }
         }
       end
 

@@ -4,14 +4,14 @@ class OmniSerializer::Simple::QueryBuilder
   extend Dry::Initializer
 
   # @param resource_class [Class] The resource class to serialize.
-  # @param params [Hash] The params to use for serialization.
+  # @param arguments [Hash] The arguments to use for serialization.
   # @param include [Symbol | Array<Symbol | Hash<Symbol, Hash>> | Hash<Symbol, Hash>]
   # @param only [Symbol | Array<Symbol | Hash<Symbol, Hash>> | Hash<Symbol, Hash>]
   # @param except [Symbol | Array<Symbol | Hash<Symbol, Hash>> | Hash<Symbol, Hash>]
   # @param extra [Symbol | Array<Symbol>]
   # @return [OmniSerializer::Query]
-  def call(resource_class, params: {}, **query_options)
-    OmniSerializer::Query.new(name: :root, arguments: params, schema: {
+  def call(resource_class, arguments: {}, **query_options)
+    OmniSerializer::Query.new(name: :root, arguments:, schema: {
       resource: resource_class,
       members: query_level(resource_class, **query_options)
     })
@@ -44,7 +44,7 @@ class OmniSerializer::Simple::QueryBuilder
     )] + query_members_and_associations(resource_class, **collection)
   end
 
-  def query_members(resource_class, only: nil, except: [], extra: [])
+  def query_members(resource_class, only: nil, except: [], extra: [], **)
     only ||= default_members(resource_class)
     member_params = normalize_nested_params(only)
       .merge(normalize_nested_params(extra))
@@ -62,8 +62,8 @@ class OmniSerializer::Simple::QueryBuilder
 
       next unless association.is_a?(OmniSerializer::Resource::Association)
 
-      OmniSerializer::Query.new(name:, arguments: query_options[:params] || {},
-        schema: association_schema(association, **query_options.except(:params)))
+      OmniSerializer::Query.new(name:, arguments: query_options[:arguments] || {},
+        schema: association_schema(association, **query_options.except(:arguments)))
     end
   end
 

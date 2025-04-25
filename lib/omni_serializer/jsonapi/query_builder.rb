@@ -9,7 +9,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
   option :type_formatter, OmniSerializer::Types::Interface(:call)
   option :type_extractor, OmniSerializer::Types::Interface(:call), default: proc { ->(name) { name.split(':', 2) } }
 
-  def call(resource_class, include: {}, fields: {}, filter: {}, sort: [], **_query_options)
+  def call(resource_class, include: {}, fields: {}, filter: {}, sort: [], **)
     includes_tree = build_includes_tree(include)
     includes_tree = normalize_includes_tree(resource_class, includes_tree)
     includes_map = build_includes_map(resource_class, includes_tree)

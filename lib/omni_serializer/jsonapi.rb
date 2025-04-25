@@ -10,7 +10,7 @@ class OmniSerializer::Jsonapi
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :type_formatter, OmniSerializer::Types::Interface(:call)
 
-  def serialize(value, with:, context: {}, params: {})
+  def serialize(value, with:, params: {}, context: {})
     query = query_builder.call(with, **params)
     data = evaluator.call(value, query, context:)
     included = collect_linkage(data).except(*top_level_linkage(data))
