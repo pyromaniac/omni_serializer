@@ -9,6 +9,14 @@ class OmniSerializer::Simple
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :root, OmniSerializer::Types::Bool, default: proc { false }
 
+  def self.build(loaders:, **)
+    new(
+      query_builder: OmniSerializer::Simple::QueryBuilder.new,
+      evaluator: OmniSerializer::Evaluator.new(loaders:),
+      **
+    )
+  end
+
   # @param value [Object, Array<Object>] The object to serialize.
   # @param with [Class] The resource class to use for serialization.
   # @param params [Hash] The params to use for serialization.

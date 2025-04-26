@@ -1,14 +1,12 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Jsonapi do
-  subject(:serializer) { described_class.new(query_builder:, evaluator:, key_formatter:, type_formatter:) }
+  subject(:serializer) { described_class.build(loaders:, key_formatter:, type_formatter:) }
 
-  let(:query_builder) { OmniSerializer::Jsonapi::QueryBuilder.new(key_formatter:, type_formatter:) }
   let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
   let(:key_formatter_options) { { casing: :snake } }
   let(:type_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **type_formatter_options) }
   let(:type_formatter_options) { { casing: :snake, number: :plural } }
-  let(:evaluator) { OmniSerializer::Evaluator.new(loaders:) }
   let(:loaders) { {} }
 
   describe '#serialize' do

@@ -10,6 +10,16 @@ class OmniSerializer::Jsonapi
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :type_formatter, OmniSerializer::Types::Interface(:call)
 
+  def self.build(loaders:, key_formatter:, type_formatter:, **)
+    new(
+      query_builder: OmniSerializer::Jsonapi::QueryBuilder.new(key_formatter:, type_formatter:),
+      evaluator: OmniSerializer::Evaluator.new(loaders:),
+      key_formatter:,
+      type_formatter:,
+      **
+    )
+  end
+
   def serialize(value, with:, params: {}, context: {})
     query = query_builder.call(with, **params)
     data = evaluator.call(value, query, context:)

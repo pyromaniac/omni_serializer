@@ -1,14 +1,12 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Simple do
-  subject(:serializer) { described_class.new(query_builder:, evaluator:, key_formatter:, **options) }
+  subject(:serializer) { described_class.build(loaders:, key_formatter:, **options) }
 
-  let(:options) { {} }
-  let(:query_builder) { OmniSerializer::Simple::QueryBuilder.new }
-  let(:evaluator) { OmniSerializer::Evaluator.new(loaders:) }
   let(:loaders) { {} }
   let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
   let(:key_formatter_options) { {} }
+  let(:options) { {} }
 
   describe '#serialize' do
     let!(:post1) { Post.create!(title: 'Post 1', content: { foo: 42 }) }
