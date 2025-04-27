@@ -38,10 +38,18 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
         expect { params_normalizer.call(PostResource, fields: '') }
           .to raise_error(OmniSerializer::Error, '`fields` parameter must be an mapping')
         expect { params_normalizer.call(PostResource, fields: { posts: 'invalid' }) }
-          .to raise_error(OmniSerializer::UndefinedMember, 'Undefined member: `invalid` for `PostResource`')
+          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Undefined member `invalid` for `posts`, ' \
+              'valid members are: `id`, `post-title`, `post-content`, `comments-count`',
+            status: 400,
+            source: { parameter: 'fields' }
+          }))
         expect { params_normalizer.call(PostResource, include: 'post-author', fields: { comments: 'comment-body' }) }
-          .to raise_error(OmniSerializer::UndefinedQueryType,
-            'Undefined type: `comments`, query types: `posts`, `users`')
+          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Invalid type given: `comments`, valid types are: `posts`, `users`',
+            status: 400,
+            source: { parameter: 'fields' }
+          }))
         expect { params_normalizer.call(PostResource, filter: '') }
           .to raise_error(OmniSerializer::Error, '`filter` parameter must be an mapping')
       end

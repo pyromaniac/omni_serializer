@@ -18,48 +18,21 @@ require 'omni_serializer/simple'
 require 'omni_serializer/simple/query_builder'
 require 'omni_serializer/jsonapi'
 require 'omni_serializer/jsonapi/query_builder'
+require 'omni_serializer/jsonapi/deserializer'
 
 module OmniSerializer
   class Error < StandardError; end
 
-  class UndefinedAssociation < Error
-    attr_reader :resource_class, :name
+  class JsonapiError < Error
+    attr_reader :error_data
 
-    def initialize(resource_class, name)
-      @resource_class = resource_class
-      @name = name
-      super("Undefined association: `#{name}` for `#{resource_class}`")
+    def initialize(detail:, status: 400, **error_data)
+      super(detail)
+      @error_data = error_data.merge(detail:, status:)
     end
-  end
 
-  class UndefinedAssociationType < Error
-    attr_reader :resource_class, :name, :type
-
-    def initialize(resource_class, name, type)
-      @resource_class = resource_class
-      @name = name
-      @type = type
-      super("Undefined association type: `#{type}` for `#{name}` on `#{resource_class}`")
-    end
-  end
-
-  class UndefinedQueryType < Error
-    attr_reader :type, :query_types
-
-    def initialize(type, query_types)
-      @type = type
-      @query_types = query_types
-      super("Undefined type: `#{type}`, query types: `#{query_types.join('`, `')}`")
-    end
-  end
-
-  class UndefinedMember < Error
-    attr_reader :resource_class, :name
-
-    def initialize(resource_class, name)
-      @resource_class = resource_class
-      @name = name
-      super("Undefined member: `#{name}` for `#{resource_class}`")
+    def status
+      @error_data[:status]
     end
   end
 end

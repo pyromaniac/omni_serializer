@@ -1,19 +1,45 @@
 # frozen_string_literal: true
 
+# Main JSONAPI serialization/deserialization entry point.
+# Should be memoized in the scope of the API version and then used in every controller action.
 class OmniSerializer::Jsonapi
   extend Dry::Initializer
+
+  # A JSONAPI error object structure.
+  class Error < Dry::Struct
+    attribute? :id, OmniSerializer::Types::String
+    attribute? :links, OmniSerializer::Types::Hash.schema(
+      about?: OmniSerializer::Types::String,
+      type?: OmniSerializer::Types::String
+    ).strict.constrained(filled: true)
+    attribute? :status, OmniSerializer::Types::Coercible::String
+    attribute? :code, OmniSerializer::Types::Coercible::String
+    attribute? :title, OmniSerializer::Types::String
+    attribute? :detail, OmniSerializer::Types::String
+    attribute? :source, OmniSerializer::Types::Hash.schema(
+      pointer?: OmniSerializer::Types::String,
+      parameter?: OmniSerializer::Types::String,
+      header?: OmniSerializer::Types::String
+    ).strict.constrained(filled: true)
+    attribute? :meta, OmniSerializer::Types::Hash
+      .map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any).constrained(filled: true)
+  end
 
   RESERVED_ATTRIBUTES = %i[id type].freeze
 
   option :query_builder, OmniSerializer::Types::Interface(:call)
   option :evaluator, OmniSerializer::Types::Interface(:call)
+  option :deserializer, OmniSerializer::Types::Interface(:call)
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :type_formatter, OmniSerializer::Types::Interface(:call)
 
   def self.build(loaders:, key_formatter:, type_formatter:, **)
+    missing_key_formatter = OmniSerializer::NameFormatter.new(inflector: key_formatter.inflector, casing: :snake)
+
     new(
       query_builder: OmniSerializer::Jsonapi::QueryBuilder.new(key_formatter:, type_formatter:),
       evaluator: OmniSerializer::Evaluator.new(loaders:),
+      deserializer: OmniSerializer::Jsonapi::Deserializer.new(missing_key_formatter:, key_formatter:, type_formatter:),
       key_formatter:,
       type_formatter:,
       **
@@ -25,12 +51,26 @@ class OmniSerializer::Jsonapi
     data = evaluator.call(value, query, context:)
     included = collect_linkage(data).except(*top_level_linkage(data))
     result = { data: render_data(data) }
-    unless included.empty?
+    if params.key?(:include)
       result[:included] = included.values.map do |placeholder|
         render_resource(placeholder)
       end
     end
     result
+  end
+
+  def deserialize(params, with:)
+    deserializer.call(with, params[:data])
+  end
+
+  def errors(*errors)
+    errors = errors.flatten(1).map do |error|
+      error = error.error_data if error.respond_to?(:error_data)
+      error = Error.new(error) unless error.is_a?(Error)
+      error.to_h
+    end
+
+    { errors: }
   end
 
   private

@@ -37,10 +37,7 @@ class OmniSerializer::Simple::QueryBuilder
     [OmniSerializer::Query.new(
       name: collection_member.name,
       arguments: {},
-      schema: {
-        resource: collection_member.resource_class,
-        members: query_level(collection_member.resource_class, **query_options)
-      }
+      schema: association_schema(collection_member, types: {}, **query_options)
     )] + query_members_and_associations(resource_class, **collection)
   end
 
@@ -68,8 +65,8 @@ class OmniSerializer::Simple::QueryBuilder
   end
 
   def association_schema(association, types: {}, **query_options)
-    if association.resource_class.is_a?(Hash)
-      association.resource_class.transform_values do |resource_class|
+    if association.polymorphic?
+      association.resolved_resource.transform_values do |resource_class|
         {
           resource: resource_class,
           members: query_level(resource_class, **(types[resource_class] || query_options))
@@ -77,8 +74,8 @@ class OmniSerializer::Simple::QueryBuilder
       end
     else
       {
-        resource: association.resource_class,
-        members: query_level(association.resource_class, **query_options)
+        resource: association.resolved_resource,
+        members: query_level(association.resolved_resource, **query_options)
       }
     end
   end

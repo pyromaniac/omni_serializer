@@ -39,37 +39,47 @@ class OmniSerializer::Jsonapi::QueryBuilder
   def normalize_includes_tree(resource_class, includes_tree)
     if resource_class.collection?
       return {
-        [resource_class.collection_member.name, resource_class.collection_member.resource_class] =>
-          normalize_includes_tree(resource_class.collection_member.resource_class, includes_tree)
+        [resource_class.collection_member.name, resource_class.collection_member.resolved_resource] =>
+          normalize_includes_tree(resource_class.collection_member.resolved_resource, includes_tree)
       }
     end
 
-    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
+    transformed_associations = resource_class.members.values
+      .grep(OmniSerializer::Resource::Association)
+      .index_by { |member| key_formatter.call(member.name) }
 
     includes_tree.flat_map do |name, nested_includes|
       name, type = type_extractor.call(name)
-      association = transformed_members[name]
+      association = transformed_associations[name]
 
-      unless association.is_a?(OmniSerializer::Resource::Association)
-        raise OmniSerializer::UndefinedAssociation.new(resource_class, name)
+      unless association
+        raise OmniSerializer::JsonapiError.new(
+          detail: "Invalid include `#{name}` for `#{type_formatter.call(resource_class.type)}`, " \
+            "valid includes are: `#{transformed_associations.keys.join('`, `')}`",
+          status: 400,
+          source: { parameter: 'include' }
+        )
       end
 
-      association_types = if association.resource_class.is_a?(Hash)
-        association.resource_class.values.index_by { |resource_class| type_formatter.call(resource_class.type) }
-      else
-        { type_formatter.call(association.resource_class.type) => association.resource_class }
-      end
+      association_types = association.resource_classes.index_by { |klass| type_formatter.call(klass.type) }
 
       if type
-        raise OmniSerializer::UndefinedAssociationType.new(resource_class, name, type) unless association_types[type]
+        unless association_types[type]
+          raise OmniSerializer::JsonapiError.new(
+            detail: "Invalid type `#{type}` for include `#{name}`, " \
+              "valid types are: `#{association_types.keys.join('`, `')}`",
+            status: 400,
+            source: { parameter: 'include' }
+          )
+        end
 
-        association_types.except(type).values.map do |resource_class|
-          [[association.name, resource_class], {}]
+        association_types.except(type).values.map do |klass|
+          [[association.name, klass], {}]
         end + [[[association.name, association_types[type]],
           normalize_includes_tree(association_types[type], nested_includes)]]
       else
-        association_types.values.map do |resource_class|
-          [[association.name, resource_class], normalize_includes_tree(resource_class, nested_includes)]
+        association_types.values.map do |klass|
+          [[association.name, klass], normalize_includes_tree(klass, nested_includes)]
         end
       end
     end.group_by(&:first).transform_values { |values| values.map(&:last).inject({}, :merge) }
@@ -87,17 +97,31 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
     raise OmniSerializer::Error, '`fields` parameter must be an mapping' unless fields.is_a?(Hash)
 
-    fields.to_h do |type, fields|
-      fields = fields.split(',') if fields.is_a?(String)
-      resource_class = type_map[type.to_s]
+    fields.to_h do |type, type_fields|
+      type = type.to_s
+      type_fields = type_fields.split(',') if type_fields.is_a?(String)
+      resource_class = type_map[type]
 
-      raise OmniSerializer::UndefinedQueryType.new(type, type_map.keys) unless resource_class
+      unless resource_class
+        raise OmniSerializer::JsonapiError.new(
+          detail: "Invalid type given: `#{type}`, valid types are: `#{type_map.keys.join('`, `')}`",
+          status: 400,
+          source: { parameter: 'fields' }
+        )
+      end
 
       members_map = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
-      members = fields.filter_map do |field|
+      members = type_fields.filter_map do |field|
         member = members_map[field.to_s]
 
-        raise OmniSerializer::UndefinedMember.new(resource_class, field) unless member
+        unless member
+          member_names = members_map.select { |_, m| m.is_a?(OmniSerializer::Resource::Member) }.keys
+          raise OmniSerializer::JsonapiError.new(
+            detail: "Undefined member `#{field}` for `#{type}`, valid members are: `#{member_names.join('`, `')}`",
+            status: 400,
+            source: { parameter: 'fields' }
+          )
+        end
 
         member if member.is_a?(OmniSerializer::Resource::Member)
       end
@@ -118,7 +142,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
   end
 
   def normalize_filter_tree(resource_class, filter_tree, includes_map:)
-    resource_class = resource_class.collection_member.resource_class if resource_class.collection?
+    resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
     transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
 
     filter_tree.flat_map do |name, nested_tree|
@@ -127,15 +151,15 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
       case member
       when OmniSerializer::Resource::Association
-        association_types = if member.resource_class.is_a?(Hash)
-          member.resource_class.values.index_by { |resource_class| type_formatter.call(resource_class.type) }
-        else
-          { type_formatter.call(member.resource_class.type) => member.resource_class }
-        end
+        association_types = member.resource_classes.index_by { |klass| type_formatter.call(klass.type) }
 
         if type && !association_types[type]
-          raise OmniSerializer::UndefinedAssociationType.new(resource_class, name,
-            type)
+          raise OmniSerializer::JsonapiError.new(
+            detail: "Invalid type `#{type}` for filter on `#{name}`, " \
+              "valid types are: `#{association_types.keys.join('`, `')}`",
+            status: 400,
+            source: { parameter: 'filter' }
+          )
         end
 
         association_types.flat_map do |resource_type, association_resource|
@@ -184,8 +208,8 @@ class OmniSerializer::Jsonapi::QueryBuilder
   end
 
   def association_schema(association, includes_tree:, **query_options)
-    if association.resource_class.is_a?(Hash)
-      association.resource_class.transform_values do |resource_class|
+    if association.polymorphic?
+      association.resolved_resource.transform_values do |resource_class|
         {
           resource: resource_class,
           members: query_level(resource_class,
@@ -194,9 +218,9 @@ class OmniSerializer::Jsonapi::QueryBuilder
       end
     else
       {
-        resource: association.resource_class,
-        members: query_level(association.resource_class,
-          includes_tree: includes_tree[[association.name, association.resource_class]], **query_options)
+        resource: association.resolved_resource,
+        members: query_level(association.resolved_resource,
+          includes_tree: includes_tree[[association.name, association.resolved_resource]], **query_options)
       }
     end
   end
@@ -214,7 +238,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
   #     path.each.with_index do |segment, index|
   #       member = resource_members(resource)[key_formatter.call(segment)]
   #       if member.is_a?(OmniSerializer::Resource::Association)
-  #         resource = member.resource_class
+  #         resource = member.resolved_resource
   #         resource_chain.push(member.name)
   #       else
   #         (result[resource_chain] ||= {})[path[index..].join('.')] = direction
