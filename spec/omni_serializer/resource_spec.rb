@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Resource do
-  let(:cache) { OmniSerializer::Cache.new }
   let(:loaders) { OmniSerializer::Loaders.new({}) }
 
   describe '.type' do
@@ -127,7 +126,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.attribute' do
     subject(:resource) do
-      PostResource.new(object, cache:, loaders:, context:, arguments:)
+      PostResource.new(object, loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -221,7 +220,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.has_one' do
     subject(:resource) do
-      PostResource.new(post, cache:, loaders:, context:, arguments:)
+      PostResource.new(post, loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -265,7 +264,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.meta' do
     subject(:resource) do
-      CommentsCollectionResource.new(comments, cache:, loaders:, context:, arguments:)
+      CommentsCollectionResource.new(comments, loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -294,7 +293,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.has_many' do
     subject(:resource) do
-      PostResource.new(post, cache:, loaders:, context:, arguments:)
+      PostResource.new(post, loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -338,7 +337,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.collection' do
     subject(:resource) do
-      CommentsCollectionResource.new(comments, cache:, loaders:, context:, arguments:)
+      CommentsCollectionResource.new(comments, loaders:, context:, arguments:)
     end
 
     let(:context) { {} }

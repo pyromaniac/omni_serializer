@@ -2,6 +2,7 @@
 
 require 'dataloader'
 
+# Provides cached loader instance to the context for the Dataloader pattern to work.
 class OmniSerializer::Loaders
   extend Dry::Initializer
 

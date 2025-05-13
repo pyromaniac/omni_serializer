@@ -6,7 +6,6 @@ class OmniSerializer::Resource
   COLLECTION_MEMBER = :to_a
 
   param :object, OmniSerializer::Types::Any
-  option :cache, OmniSerializer::Types::Interface(:fetch)
   option :loaders, OmniSerializer::Types::Interface(:loader)
   option :context, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
   option :arguments, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
@@ -89,10 +88,10 @@ class OmniSerializer::Resource
       end
 
       class_eval <<~RUBY, __FILE__, __LINE__ + 1
-        def #{member.name}(**kwargs)
-          #{condition}
-          #{evaluation}
-        end
+        def #{member.name}(**kwargs) # def description(**kwargs)
+          #{condition}               #   return unless instance_exec(&self.class.members[:description].condition)
+          #{evaluation}              #   object.description(**kwargs)
+        end                          # end
       RUBY
     end
   end

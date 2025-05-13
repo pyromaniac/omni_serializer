@@ -125,7 +125,8 @@ class OmniSerializer::Jsonapi
   end
 
   def render_resource(placeholder)
-    members = placeholder.resource.class.members.except(*RESERVED_ATTRIBUTES).values.grep(OmniSerializer::Resource::Member)
+    members = placeholder.resource.class.members.except(*RESERVED_ATTRIBUTES)
+      .values.grep(OmniSerializer::Resource::Member)
     attribute_names = members.select { |member| member.macro == :attribute }.map(&:name)
     meta_names = members.select { |member| member.macro == :meta }.map(&:name)
 
@@ -141,7 +142,8 @@ class OmniSerializer::Jsonapi
   end
 
   def render_relationships(placeholder)
-    associations = placeholder.resource.class.members.values.grep(OmniSerializer::Resource::Association).index_by(&:name)
+    associations = placeholder.resource.class.members.values
+      .grep(OmniSerializer::Resource::Association).index_by(&:name)
 
     associations.to_h do |name, association|
       relationship = if placeholder.values.key?(name)

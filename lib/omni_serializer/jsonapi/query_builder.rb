@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# Builds a query tree for the JSONAPI serializer arguments.
 class OmniSerializer::Jsonapi::QueryBuilder
   extend Dry::Initializer
 
@@ -16,7 +17,6 @@ class OmniSerializer::Jsonapi::QueryBuilder
     fields = normalize_fields(fields || {}, includes_map:)
     filter_tree = build_filter_tree(filter || {})
     filter_tree = normalize_filter_tree(resource_class, filter_tree, includes_map:)
-    filter_tree = filter_tree.group_by(&:first).transform_values { |values| values.map(&:last).inject({}, :merge) }
 
     arguments = filter_tree.key?([]) ? { filter: filter_tree[[]] } : {}
     OmniSerializer::Query.new(name: :root, arguments:, schema: {
@@ -48,7 +48,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
       .grep(OmniSerializer::Resource::Association)
       .index_by { |member| key_formatter.call(member.name) }
 
-    includes_tree.flat_map do |name, nested_includes|
+    include_chains = includes_tree.flat_map do |name, nested_includes|
       name, type = type_extractor.call(name)
       association = transformed_associations[name]
 
@@ -82,11 +82,13 @@ class OmniSerializer::Jsonapi::QueryBuilder
           [[association.name, klass], normalize_includes_tree(klass, nested_includes)]
         end
       end
-    end.group_by(&:first).transform_values { |values| values.map(&:last).inject({}, :merge) }
+    end
+    include_chains.group_by(&:first).transform_values { |values| values.map(&:last).inject({}, :merge) }
   end
 
   def build_includes_map(resource_class, includes_tree)
-    includes_tree.each_with_object({ resource_class => [] }) do |((name, association_resource), nested_includes), result|
+    initial_value = { resource_class => [] }
+    includes_tree.each_with_object(initial_value) do |((name, association_resource), nested_includes), result|
       result[resource_class] |= [resource_class.members[name]]
       result.merge!(build_includes_map(association_resource, nested_includes)) { |_, one, two| one | two }
     end
@@ -145,7 +147,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
     resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
     transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
 
-    filter_tree.flat_map do |name, nested_tree|
+    filter_chains = filter_tree.flat_map do |name, nested_tree|
       name, type = type_extractor.call(name.to_s)
       member = transformed_members[name]
 
@@ -173,6 +175,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
         [[[], { member&.name || name => nested_tree }]]
       end
     end
+    filter_chains.group_by(&:first).transform_values { |values| values.map(&:last).inject({}, :merge) }
   end
 
   def query_level(resource_class, includes_tree:, path: [], **query_options)
@@ -182,7 +185,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
       query_associations(resource_class, path:, includes_tree:, **query_options)
   end
 
-  def query_members(resource_class, fields:, includes_tree:, **)
+  def query_members(resource_class, fields:, **)
     members = if fields.key?(resource_class)
       fields[resource_class]
     else
@@ -190,8 +193,8 @@ class OmniSerializer::Jsonapi::QueryBuilder
     end
     members = resource_class.members.values_at(*DEFAULT_ATTRIBUTES).compact | members
 
-    members.map do |members|
-      OmniSerializer::Query.new(name: members.name, arguments: {}, schema: nil)
+    members.map do |member|
+      OmniSerializer::Query.new(name: member.name, arguments: {}, schema: nil)
     end
   end
 
@@ -200,7 +203,8 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
     includes_map[resource_class].map do |association|
       current_path = resource_class.collection? ? path : [*path, [resource_class, association.name]]
-      arguments = filter_tree.key?(current_path) && !resource_class.collection? ? { filter: filter_tree[current_path] } : {}
+      filter_given = filter_tree.key?(current_path) && !resource_class.collection?
+      arguments = filter_given ? { filter: filter_tree[current_path] } : {}
       OmniSerializer::Query.new(name: association.name, arguments:,
         schema: association_schema(association, includes_tree:,
           includes_map:, filter_tree:, path: current_path, **query_options))

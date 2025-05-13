@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+# Evaluates OmniSerializer::Query by traversing the query tree and resolving the values
+# defined in resources. Since this a BFS algorithm, it is able to collect all the promises
+# and resolve them later in order to support Dataloader pattern.
 class OmniSerializer::Evaluator
   extend Dry::Initializer
 
+  # :nodoc:
   class Placeholder < Dry::Struct
     include OmniSerializer::Inspect.new(:resource, :values)
 
@@ -10,6 +14,7 @@ class OmniSerializer::Evaluator
     attribute :values, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
   end
 
+  # :nodoc:
   class QueueItem < Dry::Struct
     attribute :placeholder, Placeholder
     attribute :query, OmniSerializer::Query
@@ -19,7 +24,6 @@ class OmniSerializer::Evaluator
   option :loaders, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Class)
 
   def call(value, query, context:)
-    cache = OmniSerializer::Cache.new
     loaders = OmniSerializer::Loaders.new(@loaders)
     queue = [QueueItem.new(placeholder:, query:, value:)]
     result = nil
@@ -27,7 +31,7 @@ class OmniSerializer::Evaluator
     until queue.empty?
       queue.shift => { placeholder:, query: query_level, value: }
       value = value.sync if value.is_a?(Promise)
-      value = maybe_wrap(value, query_level, cache:, loaders:, context:)
+      value = maybe_wrap(value, query_level, loaders:, context:)
       result = placeholder if placeholder.resource.nil?
 
       placeholder.values[query_level.name] = if value.respond_to?(:to_ary)

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# Builds a query tree for the Simple serializer arguments.
 class OmniSerializer::Simple::QueryBuilder
   extend Dry::Initializer
 

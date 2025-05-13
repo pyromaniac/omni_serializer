@@ -1,13 +1,34 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Loaders do
-  subject { described_class.new(loader_classes) }
+  subject(:loaders) { described_class.new(loader_classes) }
 
-  let(:loader_classes) { { user: Class.new, post: Class.new } }
+  let(:collection_loader) do
+    Class.new do
+      def initialize(value)
+        @value = value
+      end
 
-  describe '#initialize' do
-    it 'initializes with the loader classes hash' do
-      expect(subject.loaders).to eq(loader_classes)
+      def call(keys)
+        keys.map { |key| { key:, value: @value } }
+      end
+    end
+  end
+
+  let(:loader_classes) { { collection: collection_loader } }
+
+  describe '#loader' do
+    it 'returns a cached loader instance' do
+      expect(loaders.loader(:collection, 42)).to be_a(Dataloader)
+      expect(loaders.loader(:collection, 42)).to equal(loaders.loader(:collection, 42))
+      expect(loaders.loader(:collection, 42)).not_to equal(loaders.loader(:collection, 43))
+    end
+
+    it 'calls the loader with the correct arguments' do
+      expect(loaders.loader(:collection, 42).load(:foo).sync)
+        .to eq({ key: :foo, value: 42 })
+      expect(loaders.loader(:collection, 42).load_many(%i[foo bar]).sync)
+        .to eq([{ key: :foo, value: 42 }, { key: :bar, value: 42 }])
     end
   end
 end

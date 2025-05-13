@@ -11,13 +11,14 @@ RSpec.describe OmniSerializer::Simple do
   describe '#serialize' do
     let!(:post1) { Post.create!(title: 'Post 1', content: { foo: 42 }) }
     let!(:post2) { Post.create!(title: 'Post 2', content: ['foo', 42]) }
-    let!(:post3) { Post.create!(title: 'Post 3') }
     let!(:comment1) { Comment.create!(post: post1, body: 'Comment 1') }
     let!(:comment2) { Comment.create!(post: post1, body: 'Comment 2') }
     let!(:comment3) { Comment.create!(post: post2, body: 'Comment 3') }
     let!(:user1) { User.create!(name: 'User 1', posts: [post1, post2]) }
     let!(:tag1) { Tag.create!(name: 'Tag 1', posts: [post1, post2]) }
     let!(:tag2) { Tag.create!(name: 'Tag 2', posts: [post1], comments: [comment1, comment2]) }
+
+    before { Post.create!(title: 'Post 3') }
 
     specify do
       expect(serializer.serialize(post1, with: PostResource, params: {
