@@ -7,7 +7,10 @@ gemspec
 
 gem 'activerecord'
 gem 'database_cleaner-active_record'
+gem 'db-query-matchers'
 gem 'dry-inflector'
+gem 'hashdiff'
+gem 'rainbow'
 gem 'rake'
 gem 'rspec'
 gem 'rubocop'

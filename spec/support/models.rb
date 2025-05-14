@@ -6,6 +6,8 @@ class Post < ActiveRecord::Base
   has_many :comments
   has_many :taggings, as: :taggable
   has_many :tags, through: :taggings
+
+  scope :published, ->(before) { where(published_at: ..before) }
 end
 
 class User < ActiveRecord::Base
@@ -24,6 +26,8 @@ class Comment < ActiveRecord::Base
   belongs_to :user
   has_many :taggings, as: :taggable
   has_many :tags, through: :taggings
+
+  scope :active, -> { where(deleted_at: nil) }
 end
 
 class Tagging < ActiveRecord::Base

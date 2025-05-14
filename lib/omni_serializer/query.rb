@@ -14,4 +14,8 @@ class OmniSerializer::Query < Dry::Struct
   attribute :arguments, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
   attribute :schema,
     (ResourceSchema | OmniSerializer::Types::Hash.map(OmniSerializer::Types::Class, ResourceSchema)).optional
+
+  def self.build(name, arguments: {}, schema: nil)
+    new(name:, arguments:, schema:)
+  end
 end

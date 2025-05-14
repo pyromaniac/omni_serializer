@@ -10,7 +10,7 @@ class OmniSerializer::Evaluator
   class Placeholder < Dry::Struct
     include OmniSerializer::Inspect.new(:resource, :values)
 
-    attribute :resource, OmniSerializer::Types::Any.optional
+    attribute :resource, OmniSerializer::Types::Instance(OmniSerializer::Resource).optional
     attribute :values, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
   end
 
@@ -19,25 +19,26 @@ class OmniSerializer::Evaluator
     attribute :placeholder, Placeholder
     attribute :query, OmniSerializer::Query
     attribute :value, OmniSerializer::Types::Any
+    attribute :path, OmniSerializer::Types::Array.of(OmniSerializer::Types::Symbol | OmniSerializer::Types::Integer)
   end
 
   option :loaders, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Class)
 
   def call(value, query, context:)
     loaders = OmniSerializer::Loaders.new(@loaders)
-    queue = [QueueItem.new(placeholder:, query:, value:)]
+    queue = [QueueItem.new(placeholder:, query:, value:, path: [:root])]
     result = nil
 
     until queue.empty?
-      queue.shift => { placeholder:, query: query_level, value: }
+      queue.shift => { placeholder:, query: query_level, value:, path: }
       value = value.sync if value.is_a?(Promise)
-      value = maybe_wrap(value, query_level, loaders:, context:)
+      value = maybe_wrap(value, placeholder.resource&.object, path, query_level, loaders:, context:)
       result = placeholder if placeholder.resource.nil?
 
       placeholder.values[query_level.name] = if value.respond_to?(:to_ary)
-        value.map { |item| enqueue(queue, item, query_level) }
+        value.map.with_index { |item, index| enqueue(queue, item, query_level, path + [index]) }
       else
-        enqueue(queue, value, query_level)
+        enqueue(queue, value, query_level, path)
       end
     end
 
@@ -46,18 +47,19 @@ class OmniSerializer::Evaluator
 
   private
 
-  def maybe_wrap(object, query, **options)
+  def maybe_wrap(object, parent, path, query, **options)
     return object if query.schema.nil? || object.nil?
 
     if object.respond_to?(:to_ary)
       if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
-        placeholder(query.schema.resource.new(object, arguments: query.arguments, **options))
+        placeholder(query.schema.resource.new(object, parent:, path:, arguments: query.arguments, **options))
       else
         object.map do |item|
           if query.schema.is_a?(Hash)
-            placeholder(query.schema[item.class].resource.new(item, arguments: query.arguments, **options))
+            placeholder(query.schema[item.class].resource
+              .new(item, parent:, path:, arguments: query.arguments, **options))
           else
-            placeholder(query.schema.resource.new(item, arguments: query.arguments, **options))
+            placeholder(query.schema.resource.new(item, parent:, path:, arguments: query.arguments, **options))
           end
         end
       end
@@ -65,9 +67,10 @@ class OmniSerializer::Evaluator
       return if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
 
       if query.schema.is_a?(Hash)
-        placeholder(query.schema[object.class].resource.new(object, arguments: query.arguments, **options))
+        placeholder(query.schema[object.class].resource
+          .new(object, parent:, path:, arguments: query.arguments, **options))
       else
-        placeholder(query.schema.resource.new(object, arguments: query.arguments, **options))
+        placeholder(query.schema.resource.new(object, parent:, path:, arguments: query.arguments, **options))
       end
     end
   end
@@ -76,7 +79,7 @@ class OmniSerializer::Evaluator
     Placeholder.new(resource:, values:)
   end
 
-  def enqueue(queue, value, query)
+  def enqueue(queue, value, query, path)
     if value.is_a?(Placeholder)
       members = if query.schema.is_a?(Hash)
         query.schema[value.resource.object.class].members
@@ -88,7 +91,8 @@ class OmniSerializer::Evaluator
           QueueItem.new(
             placeholder: value,
             value: value.resource.public_send(nested_query.name, **nested_query.arguments),
-            query: nested_query
+            query: nested_query,
+            path: path + [nested_query.name]
           )
         )
       end

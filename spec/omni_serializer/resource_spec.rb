@@ -126,7 +126,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.attribute' do
     subject(:resource) do
-      PostResource.new(object, loaders:, context:, arguments:)
+      PostResource.new(object, parent: nil, path: [], loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -220,7 +220,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.has_one' do
     subject(:resource) do
-      PostResource.new(post, loaders:, context:, arguments:)
+      PostResource.new(post, parent: nil, path: [], loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -264,7 +264,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.meta' do
     subject(:resource) do
-      CommentsCollectionResource.new(comments, loaders:, context:, arguments:)
+      CommentsCollectionResource.new(comments, parent: nil, path: [], loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -293,7 +293,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.has_many' do
     subject(:resource) do
-      PostResource.new(post, loaders:, context:, arguments:)
+      PostResource.new(post, parent: nil, path: [], loaders:, context:, arguments:)
     end
 
     let(:context) { {} }
@@ -337,7 +337,7 @@ RSpec.describe OmniSerializer::Resource do
 
   describe '.collection' do
     subject(:resource) do
-      CommentsCollectionResource.new(comments, loaders:, context:, arguments:)
+      CommentsCollectionResource.new(comments, parent: nil, path: [], loaders:, context:, arguments:)
     end
 
     let(:context) { {} }

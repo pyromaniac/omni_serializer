@@ -42,6 +42,9 @@ GEM
     dataloader (1.0.0)
       concurrent-ruby (~> 1)
       promise.rb (~> 0.7.3)
+    db-query-matchers (0.14.0)
+      activesupport (>= 4.0, < 8.1)
+      rspec (>= 3.0)
     diff-lcs (1.6.2)
     drb (2.2.1)
     dry-core (1.1.0)
@@ -67,6 +70,7 @@ GEM
       dry-inflector (~> 1.0)
       dry-logic (~> 1.4)
       zeitwerk (~> 2.6)
+    hashdiff (1.1.2)
     i18n (1.14.7)
       concurrent-ruby (~> 1.0)
     ice_nine (0.11.2)
@@ -144,8 +148,11 @@ PLATFORMS
 DEPENDENCIES
   activerecord
   database_cleaner-active_record
+  db-query-matchers
   dry-inflector
+  hashdiff
   omni_serializer!
+  rainbow
   rake
   rspec
   rubocop

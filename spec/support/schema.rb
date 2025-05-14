@@ -9,6 +9,7 @@ ActiveRecord::Schema.define do
     t.column :category_id, :integer
     t.column :title, :string
     t.column :content, :jsonb
+    t.column :published_at, :datetime
   end
 
   create_table :users do |t|
@@ -24,6 +25,7 @@ ActiveRecord::Schema.define do
     t.column :user_id, :integer
     t.column :post_id, :integer
     t.column :body, :text
+    t.column :deleted_at, :datetime
   end
 
   create_table :taggings do |t|

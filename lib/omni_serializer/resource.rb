@@ -6,6 +6,8 @@ class OmniSerializer::Resource
   COLLECTION_MEMBER = :to_a
 
   param :object, OmniSerializer::Types::Any
+  option :parent, OmniSerializer::Types::Any
+  option :path, OmniSerializer::Types::Array.of(OmniSerializer::Types::Symbol | OmniSerializer::Types::Integer)
   option :loaders, OmniSerializer::Types::Interface(:loader)
   option :context, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
   option :arguments, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
@@ -29,8 +31,8 @@ class OmniSerializer::Resource
     end
 
     def attribute(name, **options, &block)
-      define_member(Member.new(name:, macro: :attribute, expose: true, **options, condition: options[:if],
-        evaluator: block))
+      define_member(Member.new(name:, macro: :attribute, expose: true,
+        **options, condition: options[:if], evaluator: block))
     end
 
     def attributes(*names)
@@ -38,8 +40,8 @@ class OmniSerializer::Resource
     end
 
     def meta(name, **options, &block)
-      define_member(Member.new(name:, macro: :meta, expose: false, **options, condition: options[:if],
-        evaluator: block))
+      define_member(Member.new(name:, macro: :meta, expose: false,
+        **options, condition: options[:if], evaluator: block))
     end
 
     def has_one(name, **, &) # rubocop:disable Naming/PredicateName

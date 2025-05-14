@@ -3,10 +3,22 @@
 require 'omni_serializer'
 require 'active_record'
 require 'database_cleaner/active_record'
+require 'db_query_matchers'
 require_relative 'support/schema'
 require_relative 'support/models'
 require_relative 'support/resources'
+require_relative 'support/loaders'
 require_relative 'support/class_helpers'
+require_relative 'support/rspec_hash_diff'
+
+DBQueryMatchers.configure do |config|
+  config.ignores = [/SHOW TABLES LIKE/]
+  config.schemaless = true
+  config.log_backtrace = true
+  config.backtrace_filter = proc do |backtrace|
+    backtrace.select { |line| line.include?('/omni_serializer/') }
+  end
+end
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

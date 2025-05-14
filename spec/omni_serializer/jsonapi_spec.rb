@@ -3,15 +3,15 @@
 RSpec.describe OmniSerializer::Jsonapi do
   subject(:serializer) { described_class.build(loaders:, key_formatter:, type_formatter:) }
 
+  let(:loaders) { { record: RecordLoader, collection: CollectionLoader, aggregate: AggregateLoader } }
   let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
   let(:key_formatter_options) { { casing: :snake } }
   let(:type_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **type_formatter_options) }
   let(:type_formatter_options) { { casing: :snake, number: :plural } }
-  let(:loaders) { {} }
 
   describe '#serialize' do
-    let!(:post1) { Post.create!(title: 'Post 1', content: { foo: 42 }) }
-    let!(:post2) { Post.create!(title: 'Post 2', content: ['foo', 42]) }
+    let!(:post1) { Post.create!(title: 'Post 1', content: { foo: 42 }, published_at: 1.day.ago) }
+    let!(:post2) { Post.create!(title: 'Post 2', content: ['foo', 42], published_at: 1.day.ago) }
     let!(:post3) { Post.create!(title: 'Post 3') }
     let!(:comment1) { Comment.create!(post: post1, body: 'Comment 1') }
     let!(:comment2) { Comment.create!(post: post1, body: 'Comment 2') }
@@ -146,6 +146,7 @@ RSpec.describe OmniSerializer::Jsonapi do
         expect(serializer.serialize(
           Category.where(parent_id: nil),
           with: CategoryResource,
+          context: { now: Time.now.utc },
           params: { include: 'parent,children,posts' }
         )).to eq({
           data: [{
@@ -195,7 +196,7 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
-              'posts' => { data: [{ id: post3.id.to_s, type: 'Posts' }] }
+              'posts' => { data: [] }
             }
           }, {
             id: category6.id.to_s,
@@ -216,11 +217,6 @@ RSpec.describe OmniSerializer::Jsonapi do
             type: 'Posts',
             attributes: { 'post-title' => 'Post 2', 'post-content' => ['foo', 42] },
             relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
-          }, {
-            id: post3.id.to_s,
-            type: 'Posts',
-            attributes: { 'post-title' => 'Post 3', 'post-content' => nil },
-            relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
           }]
         })
       end
@@ -236,6 +232,7 @@ RSpec.describe OmniSerializer::Jsonapi do
       specify do
         expect(serializer.serialize(Tagging.order(:id),
           with: TaggingResource,
+          context: { now: Time.now.utc },
           params: {
             include: 'tag,taggable:post.postAuthor',
             fields: { post: 'postTitle', comment: 'commentBody' }
@@ -285,7 +282,7 @@ RSpec.describe OmniSerializer::Jsonapi do
               id: tag1.id.to_s,
               type: 'tag',
               attributes: { 'tagName' => 'Tag 1' },
-              relationships: { 'tagging' => {}, 'taggables' => {} }
+              relationships: { 'taggings' => {}, 'taggables' => {} }
             }, {
               id: post1.id.to_s,
               type: 'post',
@@ -310,7 +307,7 @@ RSpec.describe OmniSerializer::Jsonapi do
               id: tag2.id.to_s,
               type: 'tag',
               attributes: { 'tagName' => 'Tag 2' },
-              relationships: { 'tagging' => {}, 'taggables' => {} }
+              relationships: { 'taggings' => {}, 'taggables' => {} }
             }, {
               id: comment1.id.to_s,
               type: 'comment',

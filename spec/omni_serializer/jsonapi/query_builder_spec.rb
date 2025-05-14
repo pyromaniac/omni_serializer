@@ -40,7 +40,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
         expect { params_normalizer.call(PostResource, fields: { posts: 'invalid' }) }
           .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Undefined member `invalid` for `posts`, ' \
-              'valid members are: `id`, `post-title`, `post-content`, `comments-count`',
+              'valid members are: `id`, `post-title`, `post-content`, `comments-count`, `tag-names`',
             status: 400,
             source: { parameter: 'fields' }
           }))
@@ -125,7 +125,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when include is polymorphic' do
       let(:resource) { TagResource }
-      let(:options) { { include: 'taggables,tagging.taggable:posts.post-author' } }
+      let(:options) { { include: 'taggables,taggings.taggable:posts.post-author' } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
@@ -157,7 +157,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 ]
               }
             } },
-            { name: :tagging, arguments: {}, schema: {
+            { name: :taggings, arguments: {}, schema: {
               resource: TaggingResource,
               members: [
                 { name: :id, arguments: {}, schema: nil },
@@ -194,7 +194,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when include is polymorphic with types expanded on different levels' do
       let(:resource) { TagResource }
-      let(:options) { { include: 'taggables:comments.comment-author,tagging.taggable:posts.post-author' } }
+      let(:options) { { include: 'taggables:comments.comment-author,taggings.taggable:posts.post-author' } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
@@ -233,7 +233,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 ]
               }
             } },
-            { name: :tagging, arguments: {}, schema: {
+            { name: :taggings, arguments: {}, schema: {
               resource: TaggingResource,
               members: [
                 { name: :id, arguments: {}, schema: nil },
