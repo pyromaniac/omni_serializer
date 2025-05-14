@@ -31,7 +31,7 @@ class OmniSerializer::Evaluator
 
     until queue.empty?
       queue.shift => { placeholder:, query: query_level, value:, path: }
-      value = value.sync if value.is_a?(Promise)
+      value = value.value! if value.is_a?(Concurrent::Promises::Future)
       value = maybe_wrap(value, placeholder.resource&.object, path, query_level, loaders:, context:)
       result = placeholder if placeholder.resource.nil?
 

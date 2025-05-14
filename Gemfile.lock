@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     omni_serializer (0.1.0)
-      dataloader
+      concurrent-ruby
       dry-initializer
       dry-struct
       dry-types
@@ -39,9 +39,6 @@ GEM
       activerecord (>= 5.a)
       database_cleaner-core (~> 2.0.0)
     database_cleaner-core (2.0.1)
-    dataloader (1.0.0)
-      concurrent-ruby (~> 1)
-      promise.rb (~> 0.7.3)
     db-query-matchers (0.14.0)
       activesupport (>= 4.0, < 8.1)
       rspec (>= 3.0)
@@ -85,7 +82,6 @@ GEM
       ast (~> 2.4.1)
       racc
     prism (1.4.0)
-    promise.rb (0.7.4)
     racc (1.8.1)
     rainbow (3.1.1)
     rake (13.2.1)

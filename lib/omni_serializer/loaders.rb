@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require 'dataloader'
-
 # Provides cached loader instance to the context for the Dataloader pattern to work.
 class OmniSerializer::Loaders
   extend Dry::Initializer
@@ -31,7 +29,7 @@ class OmniSerializer::Loaders
 
     @cache[cache_key] ||= begin
       loader = loader_class.new(*, **)
-      Dataloader.new { |keys| loader.call(keys) }
+      OmniSerializer::Dataloader.new(:immediate) { |keys| loader.call(keys) }
     end
   end
 
