@@ -35,8 +35,8 @@ class OmniSerializer::Resource
         **options, condition: options[:if], evaluator: block))
     end
 
-    def attributes(*names)
-      names.each { |name| attribute(name) }
+    def attributes(*names, **options)
+      names.each { |name| attribute(name, **options) }
     end
 
     def meta(name, **options, &block)
@@ -44,13 +44,15 @@ class OmniSerializer::Resource
         **options, condition: options[:if], evaluator: block))
     end
 
-    def has_one(name, **, &) # rubocop:disable Naming/PredicateName
+    def one(name, **, &)
       association(name, **, collection: false, &)
     end
+    alias has_one one
 
-    def has_many(name, **, &) # rubocop:disable Naming/PredicateName
+    def many(name, **, &)
       association(name, **, collection: true, &)
     end
+    alias has_many many
 
     def collection(...)
       has_many(COLLECTION_MEMBER, ...)
@@ -72,29 +74,36 @@ class OmniSerializer::Resource
 
     def define_member(member)
       @members = members.merge(member.name => member)
-      define_reader(member)
+
+      define_method(member.name) do |**arguments|
+        evaluate(member.name, **arguments)
+      end
+
       member
     end
+  end
 
-    def define_reader(member)
-      condition = if member.condition.is_a?(Symbol)
-        "return unless #{member.condition}"
-      elsif member.condition
-        "return unless instance_exec(&self.class.members[:#{member.name}].condition)"
-      end
+  def evaluate(name, **)
+    member = self.class.members.fetch(name)
 
-      evaluation = if member.evaluator
-        "instance_exec(**kwargs, &self.class.members[:#{member.name}].evaluator)"
-      else
-        "object.#{member.name}"
-      end
-
-      class_eval <<~RUBY, __FILE__, __LINE__ + 1
-        def #{member.name}(**kwargs) # def description(**kwargs)
-          #{condition}               #   return unless instance_exec(&self.class.members[:description].condition)
-          #{evaluation}              #   object.description(**kwargs)
-        end                          # end
-      RUBY
+    if member.evaluator
+      instance_exec(**, &member.evaluator)
+    else
+      object.public_send(member.name)
     end
+  end
+
+  def evaluate?(name)
+    member = self.class.members.fetch(name)
+
+    result = if member.condition.is_a?(Symbol)
+      __send__(member.condition)
+    elsif member.condition
+      instance_exec(&member.condition)
+    else
+      true
+    end
+
+    !!result
   end
 end

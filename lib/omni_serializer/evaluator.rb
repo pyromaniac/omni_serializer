@@ -12,7 +12,7 @@ class OmniSerializer::Evaluator
   class Placeholder < Dry::Struct
     include OmniSerializer::Inspect.new(:resource, :values)
 
-    attribute :resource, OmniSerializer::Types::Instance(OmniSerializer::Resource).optional
+    attribute :resource, OmniSerializer::Types::Interface(:object, :evaluate, :evaluate?).optional
     attribute :values, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
 
     def self.build(resource = nil, values: {})
@@ -43,7 +43,7 @@ class OmniSerializer::Evaluator
       next if REQUEUED.equal?(value)
 
       result = queue_item.placeholder if queue_item.placeholder.resource.nil?
-      wrap_and_enqueue(queue, queue_item, value, loaders:, context:)
+      wrap_evaluate_and_enqueue(queue, queue_item, value, loaders:, context:)
     end
 
     result.values[root_query.name]
@@ -65,11 +65,17 @@ class OmniSerializer::Evaluator
     end
   end
 
-  def wrap_and_enqueue(queue, queue_item, value, **)
+  def wrap_evaluate_and_enqueue(queue, queue_item, value, **)
     queue_item => { placeholder:, query:, path: }
-    value = maybe_wrap(value, query, parent: placeholder.resource&.object, path:, **)
 
-    placeholder.values[query.name] = if value.respond_to?(:to_ary)
+    return if placeholder.resource && !placeholder.resource.evaluate?(query.name)
+
+    value = maybe_wrap(value, query, parent: placeholder.resource&.object, path:, **)
+    placeholder.values[query.name] = evaluate_and_enqueue(queue, value, query, path)
+  end
+
+  def evaluate_and_enqueue(queue, value, query, path)
+    if value.respond_to?(:to_ary)
       value.map.with_index { |item, index| enqueue(queue, item, query, path + [index]) }
     else
       enqueue(queue, value, query, path)
@@ -122,7 +128,7 @@ class OmniSerializer::Evaluator
   def build_queue_item(value, query, path)
     QueueItem.new(
       placeholder: value,
-      value: value.resource.public_send(query.name, **query.arguments),
+      value: value.resource.evaluate(query.name, **query.arguments),
       query:,
       path: path + [query.name],
       requeued: false

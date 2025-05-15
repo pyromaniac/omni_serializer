@@ -140,8 +140,16 @@ RSpec.describe OmniSerializer::Resource do
     end
 
     specify do
+      expect(PostResource.members).to match({
+        title: an_instance_of(described_class::Member) & have_attributes(name: :title, evaluator: nil, condition: nil)
+      })
+    end
+
+    specify do
       expect(resource).to respond_to(:title)
       expect(resource.title).to eq('Hello, world!')
+      expect(resource.evaluate(:title)).to eq('Hello, world!')
+      expect(resource.evaluate?(:title)).to be(true)
     end
 
     context 'when block is given' do
@@ -159,7 +167,11 @@ RSpec.describe OmniSerializer::Resource do
         end
       end
 
-      specify { expect(resource.title).to eq('HELLO, WORLD!') }
+      specify do
+        expect(resource.title).to eq('HELLO, WORLD!')
+        expect(resource.evaluate(:title)).to eq('HELLO, WORLD!')
+        expect(resource.evaluate?(:title)).to be(true)
+      end
     end
 
     context 'when condition is given' do
@@ -169,12 +181,27 @@ RSpec.describe OmniSerializer::Resource do
         end
       end
 
-      specify { expect(resource.title).to be_nil }
+      specify do
+        expect(PostResource.members).to match({
+          title: an_instance_of(described_class::Member) &
+            have_attributes(name: :title, evaluator: nil, condition: an_instance_of(Proc))
+        })
+      end
+
+      specify do
+        expect(resource.title).to eq('Hello, world!')
+        expect(resource.evaluate(:title)).to eq('Hello, world!')
+        expect(resource.evaluate?(:title)).to be(false)
+      end
 
       context 'when condition is true' do
         let(:context) { { admin: true } }
 
-        specify { expect(resource.title).to eq('Hello, world!') }
+        specify do
+          expect(resource.title).to eq('Hello, world!')
+          expect(resource.evaluate(:title)).to eq('Hello, world!')
+          expect(resource.evaluate?(:title)).to be(true)
+        end
       end
     end
 
@@ -193,12 +220,27 @@ RSpec.describe OmniSerializer::Resource do
         end
       end
 
-      specify { expect(resource.title).to be_nil }
+      specify do
+        expect(PostResource.members).to match({
+          title: an_instance_of(described_class::Member) &
+            have_attributes(name: :title, evaluator: an_instance_of(Proc), condition: :admin?)
+        })
+      end
+
+      specify do
+        expect(resource.title).to eq('HELLO, WORLD!')
+        expect(resource.evaluate(:title)).to eq('HELLO, WORLD!')
+        expect(resource.evaluate?(:title)).to be(false)
+      end
 
       context 'when condition is true' do
         let(:context) { { admin: true } }
 
-        specify { expect(resource.title).to eq('HELLO, WORLD!') }
+        specify do
+          expect(resource.title).to eq('HELLO, WORLD!')
+          expect(resource.evaluate(:title)).to eq('HELLO, WORLD!')
+          expect(resource.evaluate?(:title)).to be(true)
+        end
       end
     end
   end
@@ -212,9 +254,28 @@ RSpec.describe OmniSerializer::Resource do
 
     specify do
       expect(PostResource.members).to match({
-        title: an_instance_of(described_class::Member) & have_attributes(name: :title),
-        content: an_instance_of(described_class::Member) & have_attributes(name: :content)
+        title: an_instance_of(described_class::Member) &
+          have_attributes(name: :title, evaluator: nil, condition: nil),
+        content: an_instance_of(described_class::Member) &
+          have_attributes(name: :content, evaluator: nil, condition: nil)
       })
+    end
+
+    context 'when options are given' do
+      before do
+        stub_class(:post_resource, described_class) do
+          attributes :title, :content, if: :admin?
+        end
+      end
+
+      specify do
+        expect(PostResource.members).to match({
+          title: an_instance_of(described_class::Member) &
+            have_attributes(name: :title, evaluator: nil, condition: :admin?),
+          content: an_instance_of(described_class::Member) &
+            have_attributes(name: :content, evaluator: nil, condition: :admin?)
+        })
+      end
     end
   end
 
