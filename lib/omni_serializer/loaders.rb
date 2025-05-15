@@ -29,7 +29,7 @@ class OmniSerializer::Loaders
 
     @cache[cache_key] ||= begin
       loader = loader_class.new(*, **)
-      OmniSerializer::Dataloader.new(:immediate) { |keys| loader.call(keys) }
+      OmniSerializer::Dataloader.new { |keys| loader.call(keys) }
     end
   end
 

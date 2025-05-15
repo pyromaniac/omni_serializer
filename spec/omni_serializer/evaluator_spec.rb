@@ -49,7 +49,7 @@ RSpec.describe OmniSerializer::Evaluator do
       context 'when it is queried as primitive' do
         it 'returns the value' do
           expect(evaluator.call(post1, query, context:)).to eq(post1)
-          expect(evaluator.call(Post.all.order(:name), query, context:))
+          expect(evaluator.call(Post.all.order(:title), query, context:))
             .to be_an(Array) & eq([post1, post2, post3, post4])
           expect(evaluator.call([post1, post2], query, context:)).to be_an(Array) & eq([post1, post2])
         end
@@ -66,7 +66,7 @@ RSpec.describe OmniSerializer::Evaluator do
         it 'returns resources' do
           expect(traverse(evaluator.call(post1, query, context:)))
             .to eq({ post_title: 'Post 1', post_content: { 'foo' => 42 } })
-          expect(traverse(evaluator.call(Post.all.order(:name), query, context:))).to eq([
+          expect(traverse(evaluator.call(Post.all.order(:title), query, context:))).to eq([
             { post_title: 'Post 1', post_content: { 'foo' => 42 } },
             { post_title: 'Post 2', post_content: ['foo', 42] },
             { post_title: 'Post 3', post_content: 'foo' },
@@ -92,7 +92,7 @@ RSpec.describe OmniSerializer::Evaluator do
 
         it 'returns resources' do
           expect(traverse(evaluator.call(post1, query, context:))).to be_nil
-          expect(traverse(evaluator.call(Post.all.order(:name), query, context:))).to eq(to_a: [
+          expect(traverse(evaluator.call(Post.all.order(:title), query, context:))).to eq(to_a: [
             { post_title: 'Post 1' }, { post_title: 'Post 2' },
             { post_title: 'Post 3' }, { post_title: 'Post 4' }
           ])
@@ -130,7 +130,7 @@ RSpec.describe OmniSerializer::Evaluator do
         end
 
         it 'utilizes loaders' do
-          expect { traverse(evaluator.call(Post.all.order(:name), query, context:)) }
+          expect { traverse(evaluator.call(Post.all.order(:title), query, context:)) }
             .to make_database_queries(count: 6)
         end
 
@@ -144,7 +144,7 @@ RSpec.describe OmniSerializer::Evaluator do
             taggings: [{}],
             tags: [{ tag_name: 'Tag 1' }]
           })
-          expect(traverse(evaluator.call(Post.all.order(:name), query, context:))).to eq([{
+          expect(traverse(evaluator.call(Post.all.order(:title), query, context:))).to eq([{
             post_title: 'Post 1',
             post_author: { user_name: 'User 1' },
             comments_count: 2,
@@ -228,7 +228,7 @@ RSpec.describe OmniSerializer::Evaluator do
         end
 
         it 'utilizes loaders' do
-          expect { traverse(evaluator.call(Post.all.order(:name), query, context:)) }
+          expect { traverse(evaluator.call(Post.all.order(:title), query, context:)) }
             .to make_database_queries(count: 5)
         end
       end

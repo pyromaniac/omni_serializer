@@ -6,77 +6,102 @@
 class OmniSerializer::Evaluator
   extend Dry::Initializer
 
+  REQUEUED = Object.new
+
   # :nodoc:
   class Placeholder < Dry::Struct
     include OmniSerializer::Inspect.new(:resource, :values)
 
     attribute :resource, OmniSerializer::Types::Instance(OmniSerializer::Resource).optional
     attribute :values, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Any)
+
+    def self.build(resource = nil, values: {})
+      new(resource:, values:)
+    end
   end
 
   # :nodoc:
   class QueueItem < Dry::Struct
     attribute :placeholder, Placeholder
-    attribute :query, OmniSerializer::Query
     attribute :value, OmniSerializer::Types::Any
+    attribute :query, OmniSerializer::Query
     attribute :path, OmniSerializer::Types::Array.of(OmniSerializer::Types::Symbol | OmniSerializer::Types::Integer)
+    attribute :requeued, OmniSerializer::Types::Bool
   end
 
   option :loaders, OmniSerializer::Types::Hash.map(OmniSerializer::Types::Symbol, OmniSerializer::Types::Class)
 
-  def call(value, query, context:)
+  def call(value, root_query, context:)
     loaders = OmniSerializer::Loaders.new(@loaders)
-    queue = [QueueItem.new(placeholder:, query:, value:, path: [:root])]
+    queue = [QueueItem.new(placeholder: Placeholder.build, value:, query: root_query, path: [], requeued: false)]
     result = nil
 
     until queue.empty?
-      queue.shift => { placeholder:, query: query_level, value:, path: }
-      value = value.value! if value.is_a?(Concurrent::Promises::Future)
-      value = maybe_wrap(value, placeholder.resource&.object, path, query_level, loaders:, context:)
-      result = placeholder if placeholder.resource.nil?
+      queue_item = queue.shift
+      value = resolve_or_requeue_promise(queue, queue_item)
 
-      placeholder.values[query_level.name] = if value.respond_to?(:to_ary)
-        value.map.with_index { |item, index| enqueue(queue, item, query_level, path + [index]) }
-      else
-        enqueue(queue, value, query_level, path)
-      end
+      next if REQUEUED.equal?(value)
+
+      result = queue_item.placeholder if queue_item.placeholder.resource.nil?
+      wrap_and_enqueue(queue, queue_item, value, loaders:, context:)
     end
 
-    result.values[query.name]
+    result.values[root_query.name]
   end
 
   private
 
-  def maybe_wrap(object, parent, path, query, **options)
-    return object if query.schema.nil? || object.nil?
+  def resolve_or_requeue_promise(queue, queue_item)
+    queue_item => { value:, requeued: }
 
-    if object.respond_to?(:to_ary)
-      if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
-        placeholder(query.schema.resource.new(object, parent:, path:, arguments: query.arguments, **options))
-      else
-        object.map do |item|
-          if query.schema.is_a?(Hash)
-            placeholder(query.schema[item.class].resource
-              .new(item, parent:, path:, arguments: query.arguments, **options))
-          else
-            placeholder(query.schema.resource.new(item, parent:, path:, arguments: query.arguments, **options))
-          end
-        end
-      end
+    return value unless value.is_a?(Concurrent::Promises::Future)
+
+    if requeued
+      value.value!
     else
-      return if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
-
-      if query.schema.is_a?(Hash)
-        placeholder(query.schema[object.class].resource
-          .new(object, parent:, path:, arguments: query.arguments, **options))
-      else
-        placeholder(query.schema.resource.new(object, parent:, path:, arguments: query.arguments, **options))
-      end
+      value.touch
+      queue.push(queue_item.new(requeued: true))
+      REQUEUED
     end
   end
 
-  def placeholder(resource = nil, values: {})
-    Placeholder.new(resource:, values:)
+  def wrap_and_enqueue(queue, queue_item, value, **)
+    queue_item => { placeholder:, query:, path: }
+    value = maybe_wrap(value, query, parent: placeholder.resource&.object, path:, **)
+
+    placeholder.values[query.name] = if value.respond_to?(:to_ary)
+      value.map.with_index { |item, index| enqueue(queue, item, query, path + [index]) }
+    else
+      enqueue(queue, value, query, path)
+    end
+  end
+
+  def maybe_wrap(object, query, **)
+    return object if query.schema.nil? || object.nil?
+
+    if object.respond_to?(:to_ary)
+      wrap_collection(object, query, arguments: query.arguments, **)
+    else
+      return if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
+
+      wrap_object(object, query, arguments: query.arguments, **)
+    end
+  end
+
+  def wrap_collection(collection, query, **)
+    if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
+      Placeholder.build(query.schema.resource.new(collection, **))
+    else
+      collection.map { |item| wrap_object(item, query, **) }
+    end
+  end
+
+  def wrap_object(object, query, **)
+    if query.schema.is_a?(Hash)
+      Placeholder.build(query.schema[object.class].resource.new(object, **))
+    else
+      Placeholder.build(query.schema.resource.new(object, **))
+    end
   end
 
   def enqueue(queue, value, query, path)
@@ -87,17 +112,20 @@ class OmniSerializer::Evaluator
         query.schema&.members || []
       end
       members.each do |nested_query|
-        queue.push(
-          QueueItem.new(
-            placeholder: value,
-            value: value.resource.public_send(nested_query.name, **nested_query.arguments),
-            query: nested_query,
-            path: path + [nested_query.name]
-          )
-        )
+        queue.push(build_queue_item(value, nested_query, path))
       end
     end
 
     value
+  end
+
+  def build_queue_item(value, query, path)
+    QueueItem.new(
+      placeholder: value,
+      value: value.resource.public_send(query.name, **query.arguments),
+      query:,
+      path: path + [query.name],
+      requeued: false
+    )
   end
 end

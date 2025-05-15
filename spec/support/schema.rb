@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
-ActiveRecord::Base.establish_connection(adapter: 'sqlite3', database: ':memory:')
+# Using PG instead of in-memory SQLite3 since the Evaluator algorithm utilizes promises
+# executed concurrently and in-memory SQLite3 doesn't support multiple connections.
+MAINTAINANCE_DB = '/postgres'
+database_url = URI.parse(ENV.fetch('DATABASE_URL', 'postgres://localhost/omni_serializer'))
+ActiveRecord::Base.establish_connection(database_url.merge(MAINTAINANCE_DB).to_s)
+ActiveRecord::Base.connection.recreate_database(database_url.path.delete_prefix('/'))
+ActiveRecord::Base.establish_connection(database_url.to_s)
 ActiveRecord::Base.logger = Logger.new(File::NULL)
 
 ActiveRecord::Schema.define do

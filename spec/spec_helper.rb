@@ -32,8 +32,8 @@ RSpec.configure do |config|
   config.include ClassHelpers
 
   config.before(:suite) do
-    DatabaseCleaner.strategy = :transaction
     DatabaseCleaner.clean_with(:truncation)
+    DatabaseCleaner.strategy = :truncation
   end
 
   config.around do |example|
