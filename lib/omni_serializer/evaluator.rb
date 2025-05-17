@@ -71,14 +71,14 @@ class OmniSerializer::Evaluator
     return if placeholder.resource && !placeholder.resource.evaluate?(query.name)
 
     value = maybe_wrap(value, query, parent: placeholder.resource&.object, path:, **)
-    placeholder.values[query.name] = evaluate_and_enqueue(queue, value, query, path)
+    placeholder.values[query.name] = evaluate_and_enqueue(queue, value, query)
   end
 
-  def evaluate_and_enqueue(queue, value, query, path)
+  def evaluate_and_enqueue(queue, value, query)
     if value.respond_to?(:to_ary)
-      value.map.with_index { |item, index| enqueue(queue, item, query, path + [index]) }
+      value.map { |item| enqueue(queue, item, query) }
     else
-      enqueue(queue, value, query, path)
+      enqueue(queue, value, query)
     end
   end
 
@@ -86,31 +86,35 @@ class OmniSerializer::Evaluator
     return object if query.schema.nil? || object.nil?
 
     if object.respond_to?(:to_ary)
-      wrap_collection(object, query, arguments: query.arguments, **)
+      wrap_collection(object, query, **)
     else
       return if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
 
-      wrap_object(object, query, arguments: query.arguments, **)
+      wrap_object(object, query, **)
     end
   end
 
-  def wrap_collection(collection, query, **)
+  def wrap_collection(collection, query, path:, **)
     if query.schema.is_a?(OmniSerializer::Query::ResourceSchema) && query.schema.resource.collection?
-      Placeholder.build(query.schema.resource.new(collection, **))
+      wrap_object(collection, query, path:, **)
     else
-      collection.map { |item| wrap_object(item, query, **) }
+      collection.map.with_index { |item, index| wrap_object(item, query, path: path + [index], **) }
     end
   end
 
-  def wrap_object(object, query, **)
-    if query.schema.is_a?(Hash)
-      Placeholder.build(query.schema[object.class].resource.new(object, **))
-    else
-      Placeholder.build(query.schema.resource.new(object, **))
+  def wrap_object(object, query, path:, **)
+    query => { schema:, arguments: }
+
+    if schema.is_a?(Hash)
+      schema = schema.fetch(object.class) do
+        raise "No schema found for #{object.class}, only #{schema.keys.join(', ')} are allowed, path: #{path.join('.')}"
+      end
     end
+
+    Placeholder.build(schema.resource.new(object, arguments:, path:, **))
   end
 
-  def enqueue(queue, value, query, path)
+  def enqueue(queue, value, query)
     if value.is_a?(Placeholder)
       members = if query.schema.is_a?(Hash)
         query.schema[value.resource.object.class].members
@@ -118,19 +122,19 @@ class OmniSerializer::Evaluator
         query.schema&.members || []
       end
       members.each do |nested_query|
-        queue.push(build_queue_item(value, nested_query, path))
+        queue.push(build_queue_item(value, nested_query))
       end
     end
 
     value
   end
 
-  def build_queue_item(value, query, path)
+  def build_queue_item(value, query)
     QueueItem.new(
       placeholder: value,
       value: value.resource.evaluate(query.name, **query.arguments),
       query:,
-      path: path + [query.name],
+      path: value.resource.path + [query.name],
       requeued: false
     )
   end

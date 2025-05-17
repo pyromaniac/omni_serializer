@@ -10,18 +10,6 @@ ActiveRecord::Base.establish_connection(database_url.to_s)
 ActiveRecord::Base.logger = Logger.new(File::NULL)
 
 ActiveRecord::Schema.define do
-  create_table :posts do |t|
-    t.column :user_id, :integer
-    t.column :category_id, :integer
-    t.column :title, :string
-    t.column :content, :jsonb
-    t.column :published_at, :datetime
-  end
-
-  create_table :users do |t|
-    t.column :name, :string
-  end
-
   create_table :categories do |t|
     t.column :name, :string
     t.column :parent_id, :integer
@@ -34,6 +22,14 @@ ActiveRecord::Schema.define do
     t.column :deleted_at, :datetime
   end
 
+  create_table :posts do |t|
+    t.column :user_id, :integer
+    t.column :category_id, :integer
+    t.column :title, :string
+    t.column :content, :jsonb
+    t.column :published_at, :datetime
+  end
+
   create_table :taggings do |t|
     t.column :tag_id, :integer
     t.column :taggable_id, :integer
@@ -41,6 +37,10 @@ ActiveRecord::Schema.define do
   end
 
   create_table :tags do |t|
+    t.column :name, :string
+  end
+
+  create_table :users do |t|
     t.column :name, :string
   end
 end

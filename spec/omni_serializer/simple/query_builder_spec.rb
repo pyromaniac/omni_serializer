@@ -50,9 +50,9 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
         {
           only: %i[post_title tags],
           except: :invalid,
-          extra: :comments_count,
+          extra: :tag_names,
           arguments: { foo: 42 },
-          include: %i[post_author comments]
+          include: %i[post_author active_comments]
         }
       end
 
@@ -61,7 +61,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
           resource: PostResource,
           members: [
             { name: :post_title, arguments: {}, schema: nil },
-            { name: :comments_count, arguments: {}, schema: nil },
+            { name: :tag_names, arguments: {}, schema: nil },
             { name: :post_author, arguments: {}, schema: {
               resource: UserResource,
               members: [
@@ -69,7 +69,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
                 { name: :user_name, arguments: {}, schema: nil }
               ]
             } },
-            { name: :comments, arguments: {}, schema: {
+            { name: :active_comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
               members: [
                 { name: :to_a, arguments: {}, schema: {
@@ -161,8 +161,8 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
       let(:options) do
         {
           include: {
-            comments: {
-              collection: { extra: [:total_count] },
+            active_comments: {
+              collection: { extra: [:pagination] },
               only: [:id, { comment_body: { bar: 43 } }],
               include: { comment_author: { except: :user_name } },
               arguments: { foo: 42 }
@@ -178,7 +178,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
             { name: :id, arguments: {}, schema: nil },
             { name: :post_title, arguments: {}, schema: nil },
             { name: :post_content, arguments: {}, schema: nil },
-            { name: :comments, arguments: { foo: 42 }, schema: {
+            { name: :active_comments, arguments: { foo: 42 }, schema: {
               resource: CommentCollectionResource,
               members: [
                 { name: :to_a, arguments: {}, schema: {
@@ -192,7 +192,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
                     } }
                   ]
                 } },
-                { name: :total_count, arguments: {}, schema: nil }
+                { name: :pagination, arguments: {}, schema: nil }
               ]
             } }
           ]
@@ -206,8 +206,8 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
         {
           include: [:tag, {
             taggable: {
-              only: [:post_title, :comment_body, { comments: { foo: 42 } }],
-              include: { post_author: { extra: [:comments_count, { posts_count: { bar: 43 } }] } }
+              only: [:post_title, { comment_body: { foo: 42 } }],
+              include: { post_author: { extra: [:post_tag_names, { comment_tag_names: { bar: 43 } }] } }
             }
           }]
         }
@@ -235,15 +235,15 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
                     members: [
                       { name: :id, arguments: {}, schema: nil },
                       { name: :user_name, arguments: {}, schema: nil },
-                      { name: :comments_count, arguments: {}, schema: nil },
-                      { name: :posts_count, arguments: { bar: 43 }, schema: nil }
+                      { name: :post_tag_names, arguments: {}, schema: nil },
+                      { name: :comment_tag_names, arguments: { bar: 43 }, schema: nil }
                     ]
                   } }
                 ]
               },
               Comment => {
                 resource: CommentResource,
-                members: [{ name: :comment_body, arguments: {}, schema: nil }]
+                members: [{ name: :comment_body, arguments: { foo: 42 }, schema: nil }]
               }
             } }
           ]

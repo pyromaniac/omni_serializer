@@ -30,24 +30,29 @@ RSpec.describe OmniSerializer::Simple do
         { 'id' => post2.id, 'post_content' => ['foo', 42] }
       ])
       expect(serializer.serialize(Post.all.order(:title), with: PostResource, params: {
-        only: [:post_title], except: nil, extra: :comments_count, include: %i[post_author comments]
+        only: [:post_title], except: nil, extra: :tag_names, include: %i[post_author active_comments]
       })).to eq([
         {
           'post_title' => 'Post 1',
-          'comments_count' => 2,
+          'tag_names' => ['Tag 1', 'Tag 2'],
           'post_author' => { 'id' => user1.id, 'user_name' => 'User 1' },
-          'comments' => [
+          'active_comments' => [
             { 'id' => comment1.id, 'comment_body' => 'Comment 1' },
             { 'id' => comment2.id, 'comment_body' => 'Comment 2' }
           ]
         },
         {
           'post_title' => 'Post 2',
-          'comments_count' => 1,
+          'tag_names' => ['Tag 1'],
           'post_author' => { 'id' => user1.id, 'user_name' => 'User 1' },
-          'comments' => [{ 'id' => comment3.id, 'comment_body' => 'Comment 3' }]
+          'active_comments' => [{ 'id' => comment3.id, 'comment_body' => 'Comment 3' }]
         },
-        { 'post_title' => 'Post 3', 'comments_count' => 0, 'post_author' => nil, 'comments' => [] }
+        {
+          'post_title' => 'Post 3',
+          'tag_names' => ['Tag 1'],
+          'post_author' => nil,
+          'active_comments' => []
+        }
       ])
     end
 

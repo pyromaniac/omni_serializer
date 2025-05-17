@@ -133,7 +133,7 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
       specify do
         expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
           detail: 'Relationship `non-existent` is not defined on `posts`, ' \
-            'valid relationships are: `post-author`, `comments`, `taggings`, `tags`.',
+            'valid relationships are: `post-author`, `active-comments`, `taggings`, `tags`.',
           status: 400,
           source: { pointer: '/data/relationships/non-existent' }
         }))
@@ -315,7 +315,7 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         {
           type: 'posts',
           relationships: {
-            comments: { data: [
+            'active-comments': { data: [
               { id: '42', type: 'comments' },
               { id: '43', type: 'comments' }
             ] }
@@ -325,14 +325,14 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
 
       specify do
         expect(result).to have_attributes(
-          params: { comment_ids: %w[42 43] },
+          params: { active_comment_ids: %w[42 43] },
           pointers: {
             [] => '/data',
             [:id] => '/data/id',
             [:type] => '/data/type',
-            [:comment_ids] => '/data/relationships/comments/data',
-            [:comment_ids, 0] => '/data/relationships/comments/data/0/id',
-            [:comment_ids, 1] => '/data/relationships/comments/data/1/id'
+            [:active_comment_ids] => '/data/relationships/active-comments/data',
+            [:active_comment_ids, 0] => '/data/relationships/active-comments/data/0/id',
+            [:active_comment_ids, 1] => '/data/relationships/active-comments/data/1/id'
           }
         )
       end
@@ -341,18 +341,18 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         let(:data) do
           {
             type: 'posts',
-            relationships: { comments: { data: [] } }
+            relationships: { 'active-comments': { data: [] } }
           }
         end
 
         specify do
           expect(result).to have_attributes(
-            params: { comment_ids: [] },
+            params: { active_comment_ids: [] },
             pointers: {
               [] => '/data',
               [:id] => '/data/id',
               [:type] => '/data/type',
-              [:comment_ids] => '/data/relationships/comments/data'
+              [:active_comment_ids] => '/data/relationships/active-comments/data'
             }
           )
         end
@@ -362,7 +362,7 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         let(:data) do
           {
             type: 'posts',
-            relationships: { comments: { data: [{ id: '42', type: 'Comments' }] } }
+            relationships: { 'active-comments': { data: [{ id: '42', type: 'Comments' }] } }
           }
         end
 
@@ -370,7 +370,7 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Invalid type given: `Comments`, valid types are: `comments`.',
             status: 409,
-            source: { pointer: '/data/relationships/comments/data/0/type' }
+            source: { pointer: '/data/relationships/active-comments/data/0/type' }
           }))
         end
       end
@@ -379,16 +379,16 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         let(:data) do
           {
             type: 'posts',
-            relationships: { comments: { data: {} } }
+            relationships: { 'active-comments': { data: {} } }
           }
         end
 
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: 'Malformed data for `comments` relationship, ' \
+            detail: 'Malformed data for `active-comments` relationship, ' \
               'should be an array of objects with string `id` and `type`.',
             status: 400,
-            source: { pointer: '/data/relationships/comments/data' }
+            source: { pointer: '/data/relationships/active-comments/data' }
           }))
         end
       end
@@ -397,16 +397,16 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         let(:data) do
           {
             type: 'posts',
-            relationships: { comments: { data: [{ id: '42', type: 'comments' }, nil] } }
+            relationships: { 'active-comments': { data: [{ id: '42', type: 'comments' }, nil] } }
           }
         end
 
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: 'Malformed data for `comments` relationship datum, ' \
+            detail: 'Malformed data for `active-comments` relationship datum, ' \
               'should be an object with string `id` and `type`.',
             status: 400,
-            source: { pointer: '/data/relationships/comments/data/1' }
+            source: { pointer: '/data/relationships/active-comments/data/1' }
           }))
         end
       end

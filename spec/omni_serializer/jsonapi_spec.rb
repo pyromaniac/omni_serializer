@@ -23,12 +23,12 @@ RSpec.describe OmniSerializer::Jsonapi do
         id: post1.id.to_s,
         type: 'posts',
         attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
-        relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
+        relationships: { 'post_author' => {}, 'active_comments' => {}, 'taggings' => {}, 'tags' => {} }
       } })
       expect(serializer.serialize(
         [post1, post2],
         with: PostResource,
-        params: { include: 'post_author,comments' }
+        params: { include: 'post_author,active_comments' }
       )).to eq({
         data: [{
           id: post1.id.to_s,
@@ -36,7 +36,7 @@ RSpec.describe OmniSerializer::Jsonapi do
           attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
           relationships: {
             'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
-            'comments' => { data: [
+            'active_comments' => { data: [
               { id: comment1.id.to_s, type: 'comments' },
               { id: comment2.id.to_s, type: 'comments' }
             ] },
@@ -49,7 +49,7 @@ RSpec.describe OmniSerializer::Jsonapi do
           attributes: { 'post_title' => 'Post 2', 'post_content' => ['foo', 42] },
           relationships: {
             'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
-            'comments' => { data: [{ id: comment3.id.to_s, type: 'comments' }] },
+            'active_comments' => { data: [{ id: comment3.id.to_s, type: 'comments' }] },
             'taggings' => {},
             'tags' => {}
           }
@@ -81,17 +81,17 @@ RSpec.describe OmniSerializer::Jsonapi do
           id: post1.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 1' },
-          relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
+          relationships: { 'post_author' => {}, 'active_comments' => {}, 'taggings' => {}, 'tags' => {} }
         }, {
           id: post2.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 2' },
-          relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
+          relationships: { 'post_author' => {}, 'active_comments' => {}, 'taggings' => {}, 'tags' => {} }
         }, {
           id: post3.id.to_s,
           type: 'posts',
           attributes: { 'post_title' => 'Post 3' },
-          relationships: { 'post_author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
+          relationships: { 'post_author' => {}, 'active_comments' => {}, 'taggings' => {}, 'tags' => {} }
         }] })
     end
 
@@ -147,7 +147,7 @@ RSpec.describe OmniSerializer::Jsonapi do
           Category.where(parent_id: nil),
           with: CategoryResource,
           context: { now: Time.now.utc },
-          params: { include: 'parent,children,posts' }
+          params: { include: 'parent,children,published-posts' }
         )).to eq({
           data: [{
             id: category1.id.to_s,
@@ -156,7 +156,7 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: nil },
               'children' => { data: [{ id: category3.id.to_s, type: 'Categories' }] },
-              'posts' => { data: [{ id: post1.id.to_s, type: 'Posts' }] }
+              'published-posts' => { data: [{ id: post1.id.to_s, type: 'Posts' }] }
             }
           }, {
             id: category2.id.to_s,
@@ -168,7 +168,7 @@ RSpec.describe OmniSerializer::Jsonapi do
                 { id: category4.id.to_s, type: 'Categories' },
                 { id: category5.id.to_s, type: 'Categories' }
               ] },
-              'posts' => { data: [] }
+              'published-posts' => { data: [] }
             }
           }],
           included: [{
@@ -178,7 +178,7 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category1.id.to_s, type: 'Categories' } },
               'children' => { data: [{ id: category6.id.to_s, type: 'Categories' }] },
-              'posts' => { data: [{ id: post2.id.to_s, type: 'Posts' }] }
+              'published-posts' => { data: [{ id: post2.id.to_s, type: 'Posts' }] }
             }
           }, {
             id: category4.id.to_s,
@@ -187,7 +187,7 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
-              'posts' => { data: [] }
+              'published-posts' => { data: [] }
             }
           }, {
             id: category5.id.to_s,
@@ -196,7 +196,7 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
-              'posts' => { data: [] }
+              'published-posts' => { data: [] }
             }
           }, {
             id: category6.id.to_s,
@@ -205,18 +205,18 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => {},
               'children' => {},
-              'posts' => {}
+              'published-posts' => {}
             }
           }, {
             id: post1.id.to_s,
             type: 'Posts',
             attributes: { 'post-title' => 'Post 1', 'post-content' => { 'foo' => 42 } },
-            relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
+            relationships: { 'post-author' => {}, 'active-comments' => {}, 'taggings' => {}, 'tags' => {} }
           }, {
             id: post2.id.to_s,
             type: 'Posts',
             attributes: { 'post-title' => 'Post 2', 'post-content' => ['foo', 42] },
-            relationships: { 'post-author' => {}, 'comments' => {}, 'taggings' => {}, 'tags' => {} }
+            relationships: { 'post-author' => {}, 'active-comments' => {}, 'taggings' => {}, 'tags' => {} }
           }]
         })
       end
@@ -289,7 +289,7 @@ RSpec.describe OmniSerializer::Jsonapi do
               attributes: { 'postTitle' => 'Post 1' },
               relationships: {
                 'postAuthor' => { data: { id: user1.id.to_s, type: 'user' } },
-                'comments' => {},
+                'activeComments' => {},
                 'taggings' => {},
                 'tags' => {}
               }
@@ -299,7 +299,7 @@ RSpec.describe OmniSerializer::Jsonapi do
               attributes: { 'postTitle' => 'Post 2' },
               relationships: {
                 'postAuthor' => { data: { id: user1.id.to_s, type: 'user' } },
-                'comments' => {},
+                'activeComments' => {},
                 'taggings' => {},
                 'tags' => {}
               }

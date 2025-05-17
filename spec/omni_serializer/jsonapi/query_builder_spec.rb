@@ -40,7 +40,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
         expect { params_normalizer.call(PostResource, fields: { posts: 'invalid' }) }
           .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Undefined member `invalid` for `posts`, ' \
-              'valid members are: `id`, `post-title`, `post-content`, `comments-count`, `tag-names`',
+              'valid members are: `id`, `post-title`, `post-content`, `tag-names`',
             status: 400,
             source: { parameter: 'fields' }
           }))
@@ -56,7 +56,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
     end
 
     context 'when include is given' do
-      let(:options) { { include: 'comments.comment-author,post-author' } }
+      let(:options) { { include: 'active-comments.comment-author,post-author' } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
@@ -65,7 +65,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             { name: :id, arguments: {}, schema: nil },
             { name: :post_title, arguments: {}, schema: nil },
             { name: :post_content, arguments: {}, schema: nil },
-            { name: :comments, arguments: {}, schema: {
+            { name: :active_comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
               members: [
                 { name: :to_a, arguments: {}, schema: {
@@ -277,7 +277,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when include is recursive' do
       let(:resource) { CategoryResource }
-      let(:options) { { include: 'parent,children,posts' } }
+      let(:options) { { include: 'parent,children,published-posts' } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
@@ -304,7 +304,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                     { name: :category_name, arguments: {}, schema: nil }
                   ]
                 } },
-                { name: :posts, arguments: {}, schema: {
+                { name: :published_posts, arguments: {}, schema: {
                   resource: PostCollectionResource,
                   members: [
                     { name: :to_a, arguments: {}, schema: {
@@ -338,7 +338,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                     { name: :category_name, arguments: {}, schema: nil }
                   ]
                 } },
-                { name: :posts, arguments: {}, schema: {
+                { name: :published_posts, arguments: {}, schema: {
                   resource: PostCollectionResource,
                   members: [
                     { name: :to_a, arguments: {}, schema: {
@@ -353,7 +353,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 } }
               ]
             } },
-            { name: :posts, arguments: {}, schema: {
+            { name: :published_posts, arguments: {}, schema: {
               resource: PostCollectionResource,
               members: [
                 { name: :to_a, arguments: {}, schema: {
@@ -460,7 +460,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when fields are given' do
       let(:resource) { PostResource }
-      let(:options) { { fields: { posts: 'post-title,comments' } } }
+      let(:options) { { fields: { posts: 'post-title,active-comments' } } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
@@ -476,7 +476,10 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
     context 'when fields and includes are given' do
       let(:resource) { PostResource }
       let(:options) do
-        { include: 'taggings.taggable,comments', fields: { taggings: '', posts: 'id', comments: 'comment-body' } }
+        {
+          include: 'taggings.taggable,active-comments',
+          fields: { taggings: '', posts: 'id', comments: 'comment-body' }
+        }
       end
 
       specify do
@@ -497,7 +500,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                         resource: TaggingResource,
                         members: [{ name: :id, arguments: {}, schema: nil }]
                       } },
-                      { name: :comments, arguments: {}, schema: {
+                      { name: :active_comments, arguments: {}, schema: {
                         resource: CommentCollectionResource,
                         members: [{ name: :to_a, arguments: {}, schema: {
                           resource: CommentResource,
@@ -519,7 +522,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 } }
               ]
             } },
-            { name: :comments, arguments: {}, schema: {
+            { name: :active_comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
               members: [
                 { name: :to_a, arguments: {}, schema: {
@@ -538,7 +541,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when filter is given' do
       let(:resource) { PostResource }
-      let(:options) { { filter: { 'post-title': 'foo', comments: { nested: 42 }, 'non-member' => 'value' } } }
+      let(:options) { { filter: { 'post-title': 'foo', 'active-comments': { nested: 42 }, 'non-member' => 'value' } } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root,
@@ -555,7 +558,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when filter is given for included member' do
       let(:resource) { PostResource }
-      let(:options) { { include: 'comments', filter: { comments: { 'comment-body': 'hello' } } } }
+      let(:options) { { include: 'active-comments', filter: { 'active-comments' => { 'comment-body': 'hello' } } } }
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root,
@@ -565,7 +568,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
               { name: :id, arguments: {}, schema: nil },
               { name: :post_title, arguments: {}, schema: nil },
               { name: :post_content, arguments: {}, schema: nil },
-              { name: :comments, arguments: { filter: { comment_body: 'hello' } }, schema: {
+              { name: :active_comments, arguments: { filter: { comment_body: 'hello' } }, schema: {
                 resource: CommentCollectionResource,
                 members: [{ name: :to_a, arguments: {}, schema: {
                   resource: CommentResource,
@@ -584,12 +587,12 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
       let(:resource) { UserResource }
       let(:options) do
         {
-          include: 'posts.comments,comments',
+          include: 'posts.active-comments,comments',
           filter: {
-            'posts.comments': { 'comment-body' => ['hello'] },
+            'posts.active-comments': { 'comment-body' => ['hello'] },
             posts: {
               'post-title': 'foobar',
-              comments: { 'comment-body': [{}], 'non-member': 'value' }
+              'active-comments': { 'comment-body': [{}], 'non-member': 'value' }
             }
           }
         }
@@ -610,7 +613,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                   { name: :post_title, arguments: {}, schema: nil },
                   { name: :post_content, arguments: {}, schema: nil },
                   {
-                    name: :comments,
+                    name: :active_comments,
                     arguments: { filter: { comment_body: ['hello', {}], 'non-member' => 'value' } },
                     schema: {
                       resource: CommentCollectionResource,
