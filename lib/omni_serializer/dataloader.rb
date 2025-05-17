@@ -5,8 +5,8 @@ require 'concurrent'
 # Dataloader pattern implementation for OmniSerializer using Concurrent::Promises.
 class OmniSerializer::Dataloader
   def initialize(executor = :io, &resolver)
-    @resolver = resolver
     @executor = executor
+    @resolver = resolver
     @mutex = Mutex.new
     flush
   end

@@ -37,9 +37,9 @@ class OmniSerializer::Loaders
 
   def cache_key(loader_class, *, **)
     if loader_class.respond_to?(:cache_key)
-      loader_class.cache_key(*, **)
+      [loader_class, loader_class.cache_key(*, **)]
     else
-      [*, **]
+      [loader_class, *, **]
     end
   end
 end

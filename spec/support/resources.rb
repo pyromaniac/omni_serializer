@@ -23,7 +23,7 @@ class PostResource < BaseResource
     tags.then { |tags| tags.map(&:name) }
   end
   has_one :post_author, resource: 'UserResource' do
-    loaders.record(User.all).load(object.user_id) if object.user_id
+    loaders.record(User).load(object.user_id) if object.user_id
   end
   has_many :comments, resource: 'CommentCollectionResource' do
     loaders.collection(Comment.active, :post_id).load(object.id)
@@ -69,10 +69,10 @@ class CategoryResource < BaseResource
     object.name
   end
   has_one :parent, resource: 'CategoryResource' do
-    loaders.record(Category.all).load(object.parent_id) if object.parent_id
+    loaders.record(Category).load(object.parent_id) if object.parent_id
   end
   has_many :children, resource: 'CategoryResource' do
-    loaders.collection(Category.all, :parent_id).load(object.id)
+    loaders.collection(Category, :parent_id).load(object.id)
   end
   has_many :posts, resource: 'PostCollectionResource' do
     loaders.collection(Post.published(context.fetch(:now)), :category_id).load(object.id)
@@ -84,10 +84,10 @@ class CommentResource < BaseResource
     object.body
   end
   has_one :post, resource: 'PostResource' do
-    loaders.record(Post.all).load(object.post_id)
+    loaders.record(Post).load(object.post_id)
   end
   has_one :comment_author, resource: 'UserResource' do
-    loaders.record(User.all).load(object.user_id) if object.user_id
+    loaders.record(User).load(object.user_id) if object.user_id
   end
   has_many :taggings, resource: 'TaggingResource' do
     loaders.collection(Tagging.where(taggable_type: 'Comment'), :taggable_id).load(object.id)
@@ -124,7 +124,7 @@ class TagResource < BaseResource
     object.name
   end
   has_many :taggings, resource: 'TaggingResource' do
-    loaders.collection(Tagging.all, :tag_id).load(object.id)
+    loaders.collection(Tagging, :tag_id).load(object.id)
   end
   has_many :taggables, resource: { Post => 'PostResource', Comment => 'CommentResource' } do
     loaders.collection(Post.joins(:taggings), %i[taggings tag_id]).load(object.id).then do |posts|
