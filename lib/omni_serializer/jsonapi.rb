@@ -51,6 +51,8 @@ class OmniSerializer::Jsonapi
     data = evaluator.call(value, query, context:)
     included = collect_linkage(data).except(*top_level_linkage(data))
     result = { data: render_data(data) }
+    meta = collection_meta(data)
+    result[:meta] = meta unless meta.empty?
     if params.key?(:include)
       result[:included] = included.values.map do |placeholder|
         render_resource(placeholder)
@@ -142,29 +144,46 @@ class OmniSerializer::Jsonapi
   end
 
   def render_relationships(placeholder)
-    associations = placeholder.resource.class.members.values
-      .grep(OmniSerializer::Resource::Association).index_by(&:name)
-
-    associations.to_h do |name, association|
-      relationship = if placeholder.values.key?(name)
-        { data: relationship_data(placeholder.values[name], association) }
+    placeholder.resource.class.members.values.grep(OmniSerializer::Resource::Association).to_h do |association|
+      relationship = if placeholder.values.key?(association.name)
+        relationship_data(placeholder.values[association.name])
       else
         {}
       end
 
-      [key_formatter.call(name), relationship]
+      [key_formatter.call(association.name), relationship]
     end
   end
 
-  def relationship_data(value, association)
-    return if value.nil?
+  def relationship_data(value)
+    return { data: nil } if value.nil?
 
-    if value.is_a?(Array)
-      value.map { |item| relationship_data(item, association) }
+    data = if value.is_a?(Array)
+      value.map { |item| relationship_linkage(item) }
     elsif value.resource.class.collection?
-      value.values[value.resource.class.collection_member.name].map { |item| relationship_data(item, association) }
+      value.values[value.resource.class.collection_member.name].map { |item| relationship_linkage(item) }
     else
-      { id: value.resource.id.to_s, type: type_formatter.call(value.resource.class.type) }
+      relationship_linkage(value)
     end
+    meta = collection_meta(value)
+
+    meta.empty? ? { data: } : { data:, meta: }
+  end
+
+  def relationship_linkage(placeholder)
+    { id: placeholder.resource.id.to_s, type: type_formatter.call(placeholder.resource.class.type) }
+  end
+
+  def collection_meta(placeholder)
+    return {} unless placeholder.is_a?(OmniSerializer::Evaluator::Placeholder) && placeholder.resource.class.collection?
+
+    placeholder.values.except(*placeholder.resource.class.collection_member.name).filter_map do |name, value|
+      member = placeholder.resource.class.members[name]
+
+      next unless member.is_a?(OmniSerializer::Resource::Member) && member.macro == :meta
+
+      value = OmniSerializer::Utils.deep_transform_keys(value) { |key| key_formatter.call(key) }
+      [key_formatter.call(name), value]
+    end.to_h
   end
 end

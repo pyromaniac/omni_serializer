@@ -36,10 +36,13 @@ RSpec.describe OmniSerializer::Jsonapi do
           attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
           relationships: {
             'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
-            'active_comments' => { data: [
-              { id: comment1.id.to_s, type: 'comments' },
-              { id: comment2.id.to_s, type: 'comments' }
-            ] },
+            'active_comments' => {
+              data: [
+                { id: comment1.id.to_s, type: 'comments' },
+                { id: comment2.id.to_s, type: 'comments' }
+              ],
+              meta: { 'pagination' => { 'total_count' => 2, 'total_pages' => 1, 'current_page' => 1 } }
+            },
             'taggings' => {},
             'tags' => {}
           }
@@ -49,7 +52,10 @@ RSpec.describe OmniSerializer::Jsonapi do
           attributes: { 'post_title' => 'Post 2', 'post_content' => ['foo', 42] },
           relationships: {
             'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
-            'active_comments' => { data: [{ id: comment3.id.to_s, type: 'comments' }] },
+            'active_comments' => {
+              data: [{ id: comment3.id.to_s, type: 'comments' }],
+              meta: { 'pagination' => { 'total_count' => 1, 'total_pages' => 1, 'current_page' => 1 } }
+            },
             'taggings' => {},
             'tags' => {}
           }
@@ -96,33 +102,39 @@ RSpec.describe OmniSerializer::Jsonapi do
     end
 
     specify do
-      expect(serializer.serialize([comment1, comment2], with: CommentCollectionResource)).to eq({ data: [{
-        id: comment1.id.to_s,
-        type: 'comments',
-        attributes: { 'comment_body' => 'Comment 1' },
-        relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
-      }, {
-        id: comment2.id.to_s,
-        type: 'comments',
-        attributes: { 'comment_body' => 'Comment 2' },
-        relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
-      }] })
-      expect(serializer.serialize(Comment.all.order(:body), with: CommentCollectionResource)).to eq({ data: [{
-        id: comment1.id.to_s,
-        type: 'comments',
-        attributes: { 'comment_body' => 'Comment 1' },
-        relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
-      }, {
-        id: comment2.id.to_s,
-        type: 'comments',
-        attributes: { 'comment_body' => 'Comment 2' },
-        relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
-      }, {
-        id: comment3.id.to_s,
-        type: 'comments',
-        attributes: { 'comment_body' => 'Comment 3' },
-        relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
-      }] })
+      expect(serializer.serialize([comment1, comment2], with: CommentCollectionResource)).to eq({
+        data: [{
+          id: comment1.id.to_s,
+          type: 'comments',
+          attributes: { 'comment_body' => 'Comment 1' },
+          relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+        }, {
+          id: comment2.id.to_s,
+          type: 'comments',
+          attributes: { 'comment_body' => 'Comment 2' },
+          relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+        }],
+        meta: { 'pagination' => { 'total_count' => 2, 'total_pages' => 1, 'current_page' => 1 } }
+      })
+      expect(serializer.serialize(Comment.all.order(:body), with: CommentCollectionResource)).to eq({
+        data: [{
+          id: comment1.id.to_s,
+          type: 'comments',
+          attributes: { 'comment_body' => 'Comment 1' },
+          relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+        }, {
+          id: comment2.id.to_s,
+          type: 'comments',
+          attributes: { 'comment_body' => 'Comment 2' },
+          relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+        }, {
+          id: comment3.id.to_s,
+          type: 'comments',
+          attributes: { 'comment_body' => 'Comment 3' },
+          relationships: { 'comment_author' => {}, 'post' => {}, 'taggings' => {}, 'tags' => {} }
+        }],
+        meta: { 'pagination' => { 'total_count' => 3, 'total_pages' => 1, 'current_page' => 1 } }
+      })
     end
 
     context 'with recursive includes' do
@@ -156,7 +168,10 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: nil },
               'children' => { data: [{ id: category3.id.to_s, type: 'Categories' }] },
-              'published-posts' => { data: [{ id: post1.id.to_s, type: 'Posts' }] }
+              'published-posts' => {
+                data: [{ id: post1.id.to_s, type: 'Posts' }],
+                meta: { 'pagination' => { 'total-count' => 1, 'total-pages' => 1, 'current-page' => 1 } }
+              }
             }
           }, {
             id: category2.id.to_s,
@@ -168,7 +183,10 @@ RSpec.describe OmniSerializer::Jsonapi do
                 { id: category4.id.to_s, type: 'Categories' },
                 { id: category5.id.to_s, type: 'Categories' }
               ] },
-              'published-posts' => { data: [] }
+              'published-posts' => {
+                data: [],
+                meta: { 'pagination' => { 'total-count' => 0, 'total-pages' => 0, 'current-page' => 1 } }
+              }
             }
           }],
           included: [{
@@ -178,7 +196,10 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category1.id.to_s, type: 'Categories' } },
               'children' => { data: [{ id: category6.id.to_s, type: 'Categories' }] },
-              'published-posts' => { data: [{ id: post2.id.to_s, type: 'Posts' }] }
+              'published-posts' => {
+                data: [{ id: post2.id.to_s, type: 'Posts' }],
+                meta: { 'pagination' => { 'total-count' => 1, 'total-pages' => 1, 'current-page' => 1 } }
+              }
             }
           }, {
             id: category4.id.to_s,
@@ -187,7 +208,10 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
-              'published-posts' => { data: [] }
+              'published-posts' => {
+                data: [],
+                meta: { 'pagination' => { 'total-count' => 0, 'total-pages' => 0, 'current-page' => 1 } }
+              }
             }
           }, {
             id: category5.id.to_s,
@@ -196,7 +220,10 @@ RSpec.describe OmniSerializer::Jsonapi do
             relationships: {
               'parent' => { data: { id: category2.id.to_s, type: 'Categories' } },
               'children' => { data: [] },
-              'published-posts' => { data: [] }
+              'published-posts' => {
+                data: [],
+                meta: { 'pagination' => { 'total-count' => 0, 'total-pages' => 0, 'current-page' => 1 } }
+              }
             }
           }, {
             id: category6.id.to_s,
