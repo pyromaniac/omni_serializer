@@ -16,7 +16,7 @@ class PaginatedCollectionResource < OmniSerializer::Resource
     per_page ? @per_page = per_page : (@per_page || 10)
   end
 
-  meta :pagination do
+  meta :pagination, expose: true do
     total_count.then do |count|
       { total_count: count, total_pages: (count / per_page.to_f).ceil, current_page: }
     end

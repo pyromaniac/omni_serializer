@@ -6,4 +6,5 @@ class OmniSerializer::Resource::Member < Dry::Struct
   attribute :evaluator, OmniSerializer::Types::Interface(:call).optional
   attribute :condition, OmniSerializer::Types::Symbol | OmniSerializer::Types::Interface(:call).optional
   attribute :expose, OmniSerializer::Types::Bool
+  attribute :transform_keys, OmniSerializer::Types::Bool
 end

@@ -36,28 +36,38 @@ RSpec.describe OmniSerializer::Simple do
           'post_title' => 'Post 1',
           'tag_names' => ['Tag 1', 'Tag 2'],
           'post_author' => { 'id' => user1.id, 'user_name' => 'User 1' },
-          'active_comments' => [
-            { 'id' => comment1.id, 'comment_body' => 'Comment 1' },
-            { 'id' => comment2.id, 'comment_body' => 'Comment 2' }
-          ]
+          'active_comments' => {
+            'pagination' => { 'current_page' => 1, 'total_count' => 2, 'total_pages' => 1 },
+            'collection' => [
+              { 'id' => comment1.id, 'comment_body' => 'Comment 1' },
+              { 'id' => comment2.id, 'comment_body' => 'Comment 2' }
+            ]
+          }
         },
         {
           'post_title' => 'Post 2',
           'tag_names' => ['Tag 1'],
           'post_author' => { 'id' => user1.id, 'user_name' => 'User 1' },
-          'active_comments' => [{ 'id' => comment3.id, 'comment_body' => 'Comment 3' }]
+          'active_comments' => {
+            'pagination' => { 'current_page' => 1, 'total_count' => 1, 'total_pages' => 1 },
+            'collection' => [{ 'id' => comment3.id, 'comment_body' => 'Comment 3' }]
+          }
         },
         {
           'post_title' => 'Post 3',
           'tag_names' => ['Tag 1'],
           'post_author' => nil,
-          'active_comments' => []
+          'active_comments' => {
+            'pagination' => { 'current_page' => 1, 'total_count' => 0, 'total_pages' => 0 },
+            'collection' => []
+          }
         }
       ])
     end
 
     context 'with collection serializer defined' do
       let(:key_formatter_options) { { casing: :camel } }
+      let(:options) { { collection_key: :my_collection } }
 
       specify do
         expect(serializer.serialize(comment1, with: CommentResource, params: {
@@ -66,14 +76,17 @@ RSpec.describe OmniSerializer::Simple do
         })).to eq({ 'post' => { 'postTitle' => 'Post 1' } })
         expect(serializer.serialize([comment1, comment2], with: CommentCollectionResource, params: {
           include: { post: { only: :post_title, include: :post_author } }
-        })).to eq([
-          { 'id' => comment1.id, 'commentBody' => 'Comment 1',
-            'post' => { 'postTitle' => 'Post 1', 'postAuthor' => { 'id' => user1.id, 'userName' => 'User 1' } } },
-          { 'id' => comment2.id, 'commentBody' => 'Comment 2',
-            'post' => { 'postTitle' => 'Post 1', 'postAuthor' => { 'id' => user1.id, 'userName' => 'User 1' } } }
-        ])
+        })).to eq({
+          'pagination' => { 'currentPage' => 1, 'totalCount' => 2, 'totalPages' => 1 },
+          'myCollection' => [
+            { 'id' => comment1.id, 'commentBody' => 'Comment 1',
+              'post' => { 'postTitle' => 'Post 1', 'postAuthor' => { 'id' => user1.id, 'userName' => 'User 1' } } },
+            { 'id' => comment2.id, 'commentBody' => 'Comment 2',
+              'post' => { 'postTitle' => 'Post 1', 'postAuthor' => { 'id' => user1.id, 'userName' => 'User 1' } } }
+          ]
+        })
         expect(serializer.serialize(Comment.all.order(:body), with: CommentCollectionResource, params: {
-          only: [], extra: [:comment_body]
+          collection: { only: [] }, only: [], extra: [:comment_body]
         })).to eq([
           { 'commentBody' => 'Comment 1' },
           { 'commentBody' => 'Comment 2' },

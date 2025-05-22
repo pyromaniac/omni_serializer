@@ -78,7 +78,8 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
                     { name: :id, arguments: {}, schema: nil },
                     { name: :comment_body, arguments: {}, schema: nil }
                   ]
-                } }
+                } },
+                { name: :pagination, arguments: {}, schema: nil }
               ]
             } }
           ]
@@ -150,7 +151,8 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
                   ]
                 } }
               ]
-            } }
+            } },
+            { name: :pagination, arguments: {}, schema: nil }
           ]
         }))
       end
@@ -162,7 +164,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
         {
           include: {
             active_comments: {
-              collection: { extra: [:pagination] },
+              to_a: { extra: [:pagination] },
               only: [:id, { comment_body: { bar: 43 } }],
               include: { comment_author: { except: :user_name } },
               arguments: { foo: 42 }

@@ -76,6 +76,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             { name: :active_comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
               members: [
+                { name: :pagination, arguments: {}, schema: nil },
                 { name: :to_a, arguments: {}, schema: {
                   resource: CommentResource,
                   members: [
@@ -112,6 +113,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
         expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
           resource: CommentCollectionResource,
           members: [
+            { name: :pagination, arguments: {}, schema: nil },
             { name: :to_a, arguments: {}, schema: {
               resource: CommentResource,
               members: [
@@ -315,6 +317,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 { name: :published_posts, arguments: {}, schema: {
                   resource: PostCollectionResource,
                   members: [
+                    { name: :pagination, arguments: {}, schema: nil },
                     { name: :to_a, arguments: {}, schema: {
                       resource: PostResource,
                       members: [
@@ -349,6 +352,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 { name: :published_posts, arguments: {}, schema: {
                   resource: PostCollectionResource,
                   members: [
+                    { name: :pagination, arguments: {}, schema: nil },
                     { name: :to_a, arguments: {}, schema: {
                       resource: PostResource,
                       members: [
@@ -364,6 +368,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             { name: :published_posts, arguments: {}, schema: {
               resource: PostCollectionResource,
               members: [
+                { name: :pagination, arguments: {}, schema: nil },
                 { name: :to_a, arguments: {}, schema: {
                   resource: PostResource,
                   members: [
@@ -510,13 +515,16 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                       } },
                       { name: :active_comments, arguments: {}, schema: {
                         resource: CommentCollectionResource,
-                        members: [{ name: :to_a, arguments: {}, schema: {
-                          resource: CommentResource,
-                          members: [
-                            { name: :id, arguments: {}, schema: nil },
-                            { name: :comment_body, arguments: {}, schema: nil }
-                          ]
-                        } }]
+                        members: [
+                          { name: :pagination, arguments: {}, schema: nil },
+                          { name: :to_a, arguments: {}, schema: {
+                            resource: CommentResource,
+                            members: [
+                              { name: :id, arguments: {}, schema: nil },
+                              { name: :comment_body, arguments: {}, schema: nil }
+                            ]
+                          } }
+                        ]
                       } }
                     ]
                   },
@@ -533,6 +541,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             { name: :active_comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
               members: [
+                { name: :pagination, arguments: {}, schema: nil },
                 { name: :to_a, arguments: {}, schema: {
                   resource: CommentResource,
                   members: [
@@ -578,13 +587,16 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
               { name: :post_content, arguments: {}, schema: nil },
               { name: :active_comments, arguments: { filter: { comment_body: 'hello' } }, schema: {
                 resource: CommentCollectionResource,
-                members: [{ name: :to_a, arguments: {}, schema: {
-                  resource: CommentResource,
-                  members: [
-                    { name: :id, arguments: {}, schema: nil },
-                    { name: :comment_body, arguments: {}, schema: nil }
-                  ]
-                } }]
+                members: [
+                  { name: :pagination, arguments: {}, schema: nil },
+                  { name: :to_a, arguments: {}, schema: {
+                    resource: CommentResource,
+                    members: [
+                      { name: :id, arguments: {}, schema: nil },
+                      { name: :comment_body, arguments: {}, schema: nil }
+                    ]
+                  } }
+                ]
               } }
             ]
           }))
@@ -614,38 +626,47 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             { name: :user_name, arguments: {}, schema: nil },
             { name: :posts, arguments: { filter: { post_title: 'foobar' } }, schema: {
               resource: PostCollectionResource,
-              members: [{ name: :to_a, arguments: {}, schema: {
-                resource: PostResource,
-                members: [
-                  { name: :id, arguments: {}, schema: nil },
-                  { name: :post_title, arguments: {}, schema: nil },
-                  { name: :post_content, arguments: {}, schema: nil },
-                  {
-                    name: :active_comments,
-                    arguments: { filter: { comment_body: ['hello', {}], 'non-member': 'value' } },
-                    schema: {
-                      resource: CommentCollectionResource,
-                      members: [{ name: :to_a, arguments: {}, schema: {
-                        resource: CommentResource,
+              members: [
+                { name: :pagination, arguments: {}, schema: nil },
+                { name: :to_a, arguments: {}, schema: {
+                  resource: PostResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :post_title, arguments: {}, schema: nil },
+                    { name: :post_content, arguments: {}, schema: nil },
+                    {
+                      name: :active_comments,
+                      arguments: { filter: { comment_body: ['hello', {}], 'non-member': 'value' } },
+                      schema: {
+                        resource: CommentCollectionResource,
                         members: [
-                          { name: :id, arguments: {}, schema: nil },
-                          { name: :comment_body, arguments: {}, schema: nil }
+                          { name: :pagination, arguments: {}, schema: nil },
+                          { name: :to_a, arguments: {}, schema: {
+                            resource: CommentResource,
+                            members: [
+                              { name: :id, arguments: {}, schema: nil },
+                              { name: :comment_body, arguments: {}, schema: nil }
+                            ]
+                          } }
                         ]
-                      } }]
+                      }
                     }
-                  }
-                ]
-              } }]
+                  ]
+                } }
+              ]
             } },
             { name: :comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
-              members: [{ name: :to_a, arguments: {}, schema: {
-                resource: CommentResource,
-                members: [
-                  { name: :id, arguments: {}, schema: nil },
-                  { name: :comment_body, arguments: {}, schema: nil }
-                ]
-              } }]
+              members: [
+                { name: :pagination, arguments: {}, schema: nil },
+                { name: :to_a, arguments: {}, schema: {
+                  resource: CommentResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :comment_body, arguments: {}, schema: nil }
+                  ]
+                } }
+              ]
             } }
           ]
         }))

@@ -8,6 +8,7 @@ class OmniSerializer::Simple
   option :evaluator, OmniSerializer::Types::Interface(:call)
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :root, OmniSerializer::Types::Bool, default: proc { false }
+  option :collection_key, OmniSerializer::Types::Symbol, default: proc { :collection }
 
   def self.build(loaders:, **)
     new(
@@ -48,8 +49,24 @@ class OmniSerializer::Simple
     if collection_member && placeholder.values.keys == [collection_member.name]
       traverse_result(placeholder.values[collection_member.name])
     else
-      traverse_result(placeholder.values).transform_keys { |key| key_formatter.call(key) }
+      traverse_result(traverse_placeholder_values(placeholder))
     end
+  end
+
+  def traverse_placeholder_values(placeholder)
+    resource_class = placeholder.resource.class
+    placeholder.values.to_h do |name, value|
+      name = collection_key if resource_class.collection? && resource_class.collection_member.name == name
+      value = maybe_deep_transform_keys(resource_class.members[name], value)
+
+      [key_formatter.call(name), value]
+    end
+  end
+
+  def maybe_deep_transform_keys(member, value)
+    return value unless member.is_a?(OmniSerializer::Resource::Member) && member.transform_keys
+
+    OmniSerializer::Utils.deep_transform_keys(value) { |key| key_formatter.call(key) }
   end
 
   def with_root(result, resource)

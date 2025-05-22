@@ -31,7 +31,7 @@ class OmniSerializer::Resource
     end
 
     def attribute(name, **options, &block)
-      define_member(Member.new(name:, macro: :attribute, expose: true,
+      define_member(Member.new(name:, macro: :attribute, expose: true, transform_keys: false,
         **options, condition: options[:if], evaluator: block))
     end
 
@@ -40,7 +40,7 @@ class OmniSerializer::Resource
     end
 
     def meta(name, **options, &block)
-      define_member(Member.new(name:, macro: :meta, expose: false,
+      define_member(Member.new(name:, macro: :meta, expose: false, transform_keys: true,
         **options, condition: options[:if], evaluator: block))
     end
 
