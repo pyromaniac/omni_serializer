@@ -46,7 +46,7 @@ class RecordLoader < BaseLoader
 
   def call(keys)
     keys_scope(keys)
-      .index_by(&path.join('_').to_sym)
+      .index_by { |record| record.attributes.fetch(path.join('_')) }
       .reverse_merge(keys.zip([nil]).to_h)
   end
 end
@@ -54,7 +54,7 @@ end
 class CollectionLoader < BaseLoader
   def call(keys)
     keys_scope(keys)
-      .group_by(&path.join('_').to_sym)
+      .group_by { |record| record.attributes.fetch(path.join('_')) }
       .reverse_merge(keys.zip([[]] * keys.size).to_h)
   end
 end

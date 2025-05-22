@@ -36,7 +36,11 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
       specify do
         expect { params_normalizer.call(PostResource, fields: '') }
-          .to raise_error(OmniSerializer::Error, '`fields` parameter must be an mapping')
+          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: '`fields` parameter must be a mapping `{"type":"field1,field2"}`, given: `""`',
+            status: 400,
+            source: { parameter: 'fields' }
+          }))
         expect { params_normalizer.call(PostResource, fields: { posts: 'invalid' }) }
           .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Undefined member `invalid` for `posts`, ' \
@@ -51,7 +55,11 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             source: { parameter: 'fields' }
           }))
         expect { params_normalizer.call(PostResource, filter: '') }
-          .to raise_error(OmniSerializer::Error, '`filter` parameter must be an mapping')
+          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: '`filter` parameter must be a mapping, given: `""`',
+            status: 400,
+            source: { parameter: 'filter' }
+          }))
       end
     end
 
@@ -545,7 +553,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root,
-          arguments: { filter: { post_title: 'foo', 'non-member' => 'value' } }, schema: {
+          arguments: { filter: { post_title: 'foo', 'non-member': 'value' } }, schema: {
             resource: PostResource,
             members: [
               { name: :id, arguments: {}, schema: nil },
@@ -614,7 +622,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                   { name: :post_content, arguments: {}, schema: nil },
                   {
                     name: :active_comments,
-                    arguments: { filter: { comment_body: ['hello', {}], 'non-member' => 'value' } },
+                    arguments: { filter: { comment_body: ['hello', {}], 'non-member': 'value' } },
                     schema: {
                       resource: CommentCollectionResource,
                       members: [{ name: :to_a, arguments: {}, schema: {
