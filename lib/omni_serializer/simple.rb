@@ -64,7 +64,7 @@ class OmniSerializer::Simple
   end
 
   def maybe_deep_transform_keys(member, value)
-    return value unless member.is_a?(OmniSerializer::Resource::Member) && member.transform_keys
+    return value unless member in OmniSerializer::Resource::Member(transform_keys: true)
 
     OmniSerializer::Utils.deep_transform_keys(value) { |key| key_formatter.call(key) }
   end

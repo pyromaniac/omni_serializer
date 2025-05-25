@@ -10,7 +10,7 @@ class OmniSerializer::Jsonapi::SortLeafNormalizer
   def call(parent, value, path:)
     value = value.split(',') if value.is_a?(String)
 
-    raise invalid_relationship_family_error(value, path) unless parent.is_a?(Class) && value.is_a?(Array)
+    raise invalid_sort_error(value, path) unless parent.is_a?(Class) && value.is_a?(Array)
 
     transformed_members = parent.members.values.index_by { |member| key_formatter.call(member.name) }
 
@@ -27,7 +27,7 @@ class OmniSerializer::Jsonapi::SortLeafNormalizer
     [member&.name || missing_key_formatter.call(name), direction]
   end
 
-  def invalid_relationship_family_error(value, path)
+  def invalid_sort_error(value, path)
     OmniSerializer::JsonapiError.new(
       detail: "Invalid sort parameter at `/#{path.join('/')}`, must be " \
         "a comma-separated list of fields, given: `#{value.to_json}`",

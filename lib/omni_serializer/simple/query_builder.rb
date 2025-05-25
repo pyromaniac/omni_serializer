@@ -83,7 +83,7 @@ class OmniSerializer::Simple::QueryBuilder
 
   def default_members(resource_class)
     resource_class.members.filter_map do |name, member|
-      name if member.is_a?(OmniSerializer::Resource::Member) && member.expose
+      name if member in OmniSerializer::Resource::Member(expose: true)
     end
   end
 
