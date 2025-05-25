@@ -88,7 +88,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
     includes_tree ||= {} if resource_class.collection?
 
     query_members(resource_class, path:, includes_tree:, **query_options) +
-      query_associations(resource_class, path:, includes_tree:, **query_options)
+      (includes_tree.nil? ? [] : query_associations(resource_class, path:, includes_tree:, **query_options))
   end
 
   def query_members(resource_class, **)
@@ -101,7 +101,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
   def resource_fields(resource_class, fields:, **)
     members = if fields.key?(resource_class)
-      fields[resource_class]
+      fields[resource_class].grep(OmniSerializer::Resource::Member)
     else
       resource_class.members.values.grep(OmniSerializer::Resource::Member).select(&:expose)
     end
@@ -117,15 +117,16 @@ class OmniSerializer::Jsonapi::QueryBuilder
     members
   end
 
-  def query_associations(resource_class, includes_tree:, includes_map:, family_params:, path:, **query_options)
-    return [] if includes_tree.nil?
+  def query_associations(resource_class, includes_map:, family_params:, fields:, path:, **)
+    associations = includes_map[resource_class]
+    associations &= fields[resource_class] if fields.key?(resource_class)
+    associations |= [resource_class.collection_member] if resource_class.collection?
 
-    includes_map[resource_class].map do |association|
+    associations.map do |association|
       current_path = resource_class.collection? ? path : [*path, [resource_class, association.name]]
       arguments = resource_class.collection? ? {} : path_arguments(family_params, current_path)
       OmniSerializer::Query.new(name: association.name, arguments:,
-        schema: association_schema(association, includes_tree:,
-          includes_map:, family_params:, path: current_path, **query_options))
+        schema: association_schema(association, includes_map:, family_params:, fields:, path: current_path, **))
     end
   end
 

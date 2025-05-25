@@ -36,8 +36,7 @@ class OmniSerializer::Jsonapi::FieldsNormalizer
   def resource_members(resource_class, type_fields, type)
     members_map = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
     type_fields.filter_map do |field|
-      member = members_map.fetch(field.to_s) { raise invalid_field_error(type, field, members_map) }
-      member if member.is_a?(OmniSerializer::Resource::Member)
+      members_map.fetch(field.to_s) { raise invalid_field_error(type, field, members_map) }
     end
   end
 

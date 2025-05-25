@@ -545,8 +545,13 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
       let(:resource) { PostResource }
       let(:options) do
         {
-          include: 'taggings.taggable,active-comments',
-          fields: { taggings: '', posts: 'id,tag-names', comments: 'comment-body', 'comment-collections' => '' }
+          include: 'taggings.taggable,active-comments,post-author',
+          fields: {
+            taggings: 'taggable',
+            posts: 'id,tag-names,taggings,active-comments',
+            comments: 'comment-body',
+            'comment-collections' => ''
+          }
         }
       end
 

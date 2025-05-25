@@ -262,7 +262,7 @@ RSpec.describe OmniSerializer::Jsonapi do
           context: { now: Time.now.utc },
           params: {
             include: 'tag,taggable:post.postAuthor',
-            fields: { post: 'postTitle', comment: 'commentBody' }
+            fields: { post: 'postTitle,postAuthor', comment: 'commentBody' }
           })).to match({
             data: [{
               id: an_instance_of(String),
