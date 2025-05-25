@@ -9,6 +9,7 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
   option :includes_normalizer, OmniSerializer::Types::Interface(:call)
   option :fields_normalizer, OmniSerializer::Types::Interface(:call)
+  option :meta_normalizer, OmniSerializer::Types::Interface(:call)
   option :family_normalizers, OmniSerializer::Types::Hash.map(
     OmniSerializer::Types::Symbol,
     OmniSerializer::Types::Interface(:call)
@@ -19,6 +20,10 @@ class OmniSerializer::Jsonapi::QueryBuilder
       includes_normalizer: OmniSerializer::Jsonapi::IncludeNormalizer
         .new(key_formatter:, type_formatter:, type_extractor:),
       fields_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer.new(key_formatter:, type_formatter:),
+      meta_normalizer: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+        OmniSerializer::Jsonapi::MetaLeafNormalizer::PARAM_KEY, key_formatter:, type_formatter:, type_extractor:,
+        leaf_normalizer: OmniSerializer::Jsonapi::MetaLeafNormalizer.new(key_formatter:)
+      ),
       family_normalizers: {
         filter: OmniSerializer::Jsonapi::FamilyNormalizer.new(
           'filter', key_formatter:, type_formatter:, type_extractor:,
@@ -39,21 +44,31 @@ class OmniSerializer::Jsonapi::QueryBuilder
     )
   end
 
-  def call(resource_class, include: [], fields: {}, **params)
-    includes_tree = includes_normalizer.call(resource_class, include)
-    includes_map = build_includes_map(resource_class, includes_tree)
-    fields = fields_normalizer.call(fields, included_resources: includes_map.keys)
-    family_params = family_normalizers.to_h do |name, normalizer|
-      [name, normalizer.call(resource_class, params[name])]
-    end
+  def call(resource_class, **)
+    query_params = normalize_query_params(resource_class, **)
 
-    OmniSerializer::Query.new(name: :root, arguments: path_arguments(family_params, []), schema: {
+    OmniSerializer::Query.new(name: :root, arguments: path_arguments(query_params[:family_params], []), schema: {
       resource: resource_class,
-      members: query_level(resource_class, includes_tree:, includes_map:, fields:, family_params:)
+      members: query_level(resource_class, **query_params)
     })
   end
 
   private
+
+  def normalize_query_params(resource_class, include: [], fields: {}, **params)
+    includes_tree = includes_normalizer.call(resource_class, include)
+    includes_map = build_includes_map(resource_class, includes_tree)
+
+    {
+      includes_tree:,
+      includes_map:,
+      fields: fields_normalizer.call(fields, included_resources: includes_map.keys),
+      meta: meta_normalizer.call(resource_class, params[OmniSerializer::Jsonapi::MetaLeafNormalizer::PARAM_KEY.to_sym]),
+      family_params: family_normalizers.to_h do |name, normalizer|
+        [name, normalizer.call(resource_class, params[name])]
+      end
+    }
+  end
 
   def build_includes_map(resource_class, includes_tree)
     initial_value = { resource_class => [] }
@@ -76,17 +91,30 @@ class OmniSerializer::Jsonapi::QueryBuilder
       query_associations(resource_class, path:, includes_tree:, **query_options)
   end
 
-  def query_members(resource_class, fields:, **)
+  def query_members(resource_class, **)
+    members = resource_fields(resource_class, **)
+    members = resource_meta(members, **) if resource_class.collection?
+    members.map do |member|
+      OmniSerializer::Query.new(name: member.name, arguments: {}, schema: nil)
+    end
+  end
+
+  def resource_fields(resource_class, fields:, **)
     members = if fields.key?(resource_class)
       fields[resource_class]
     else
       resource_class.members.values.grep(OmniSerializer::Resource::Member).select(&:expose)
     end
-    members = resource_class.members.values_at(*DEFAULT_ATTRIBUTES).compact | members
+    resource_class.members.values_at(*DEFAULT_ATTRIBUTES).compact | members
+  end
 
-    members.map do |member|
-      OmniSerializer::Query.new(name: member.name, arguments: {}, schema: nil)
+  def resource_meta(members, meta:, path:, **)
+    if meta.key?(path)
+      members -= meta[path][:except]
+      members |= meta[path][:extra]
     end
+
+    members
   end
 
   def query_associations(resource_class, includes_tree:, includes_map:, family_params:, path:, **query_options)

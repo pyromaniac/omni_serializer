@@ -103,6 +103,19 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
           status: 400,
           source: { parameter: 'sort' }
         }))
+      expect { params_normalizer.call(PostResource, 'omni:meta': '-pagination,current-page') }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Invalid omni:meta parameter at `/`, must be applied to a collection resource',
+          status: 400,
+          source: { parameter: 'omni:meta' }
+        }))
+      expect { params_normalizer.call(PostResource, 'omni:meta': { 'active-comments' => '-pagination,currentPage' }) }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Undefined omni:meta `currentPage` at `/active-comments`, ' \
+            'valid omni:meta fields are: `current-page`, `pagination`',
+          status: 400,
+          source: { parameter: 'omni:meta' }
+        }))
     end
 
     context 'when include is given' do
@@ -533,7 +546,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
       let(:options) do
         {
           include: 'taggings.taggable,active-comments',
-          fields: { taggings: '', posts: 'id', comments: 'comment-body' }
+          fields: { taggings: '', posts: 'id,tag-names', comments: 'comment-body', 'comment-collections' => '' }
         }
       end
 
@@ -542,6 +555,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
           resource: PostResource,
           members: [
             { name: :id, arguments: {}, schema: nil },
+            { name: :tag_names, arguments: {}, schema: nil },
             { name: :taggings, arguments: {}, schema: {
               resource: TaggingResource,
               members: [
@@ -551,6 +565,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                     resource: PostResource,
                     members: [
                       { name: :id, arguments: {}, schema: nil },
+                      { name: :tag_names, arguments: {}, schema: nil },
                       { name: :taggings, arguments: {}, schema: {
                         resource: TaggingResource,
                         members: [{ name: :id, arguments: {}, schema: nil }]
@@ -558,7 +573,6 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                       { name: :active_comments, arguments: {}, schema: {
                         resource: CommentCollectionResource,
                         members: [
-                          { name: :pagination, arguments: {}, schema: nil },
                           { name: :to_a, arguments: {}, schema: {
                             resource: CommentResource,
                             members: [
@@ -583,7 +597,6 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             { name: :active_comments, arguments: {}, schema: {
               resource: CommentCollectionResource,
               members: [
-                { name: :pagination, arguments: {}, schema: nil },
                 { name: :to_a, arguments: {}, schema: {
                   resource: CommentResource,
                   members: [
@@ -617,7 +630,15 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when filter is given for included member' do
       let(:resource) { PostResource }
-      let(:options) { { include: 'active-comments', filter: { 'active-comments' => { 'comment-body': 'hello' } } } }
+      let(:options) do
+        {
+          include: 'active-comments,tags',
+          filter: {
+            'active-comments' => { 'comment-body' => 'hello' },
+            'tags' => { 'name' => 'world' }
+          }
+        }
+      end
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root,
@@ -638,6 +659,13 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                       { name: :comment_body, arguments: {}, schema: nil }
                     ]
                   } }
+                ]
+              } },
+              { name: :tags, arguments: { filter: { name: 'world' } }, schema: {
+                resource: TagResource,
+                members: [
+                  { name: :id, arguments: {}, schema: nil },
+                  { name: :tag_name, arguments: {}, schema: nil }
                 ]
               } }
             ]
@@ -807,6 +835,49 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             ]
           }
         ))
+      end
+    end
+
+    context 'when omni:meta is given' do
+      let(:resource) { PostCollectionResource }
+      let(:options) do
+        {
+          include: 'active-comments',
+          'omni:meta': [
+            '-pagination',
+            { 'active-comments' => 'current-page,-pagination' }
+          ]
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root,
+          arguments: {}, schema: {
+            resource: PostCollectionResource,
+            members: [
+              { name: :to_a, arguments: {}, schema: {
+                resource: PostResource,
+                members: [
+                  { name: :id, arguments: {}, schema: nil },
+                  { name: :post_title, arguments: {}, schema: nil },
+                  { name: :post_content, arguments: {}, schema: nil },
+                  { name: :active_comments, arguments: {}, schema: {
+                    resource: CommentCollectionResource,
+                    members: [
+                      { name: :current_page, arguments: {}, schema: nil },
+                      { name: :to_a, arguments: {}, schema: {
+                        resource: CommentResource,
+                        members: [
+                          { name: :id, arguments: {}, schema: nil },
+                          { name: :comment_body, arguments: {}, schema: nil }
+                        ]
+                      } }
+                    ]
+                  } }
+                ]
+              } }
+            ]
+          }))
       end
     end
   end

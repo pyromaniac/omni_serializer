@@ -22,7 +22,7 @@ class OmniSerializer::Jsonapi::PageLeafNormalizer
   def invalid_page_error(value, path)
     OmniSerializer::JsonapiError.new(
       detail: "Invalid page parameter at `/#{path.join('/')}`, must be " \
-        "a mapping with keys: #{allowed_keys.map { |key| "`#{key}`" }.join(', ')}, given: `#{value.to_json}`",
+        "a mapping with keys: `#{allowed_keys.join('`, `')}`, given: `#{value.to_json}`",
       status: 400,
       source: { parameter: 'page' }
     )
@@ -31,7 +31,7 @@ class OmniSerializer::Jsonapi::PageLeafNormalizer
   def invalid_page_keys_error(value, path)
     OmniSerializer::JsonapiError.new(
       detail: "Invalid page key at `/#{path.join('/')}`, allowed keys " \
-        "are: #{allowed_keys.map { |key| "`#{key}`" }.join(', ')}, given: `#{value.to_json}`",
+        "are: `#{allowed_keys.join('`, `')}`, given: `#{value.to_json}`",
       status: 400,
       source: { parameter: 'page' }
     )
