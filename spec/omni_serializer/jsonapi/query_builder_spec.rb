@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
-  subject(:params_normalizer) { described_class.new(key_formatter:, type_formatter:) }
+  subject(:params_normalizer) { described_class.build(missing_key_formatter:, key_formatter:, type_formatter:) }
 
+  let(:missing_key_formatter) do
+    OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, casing: :snake, symbolize: true)
+  end
   let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
   let(:key_formatter_options) { { casing: :kebab } }
   let(:type_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **type_formatter_options) }
@@ -15,52 +18,91 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
     let(:options) { {} }
 
     context 'when some empty params are given' do
-      let(:default_post_query) do
-        OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+      specify do
+        expect(query).to eq(OmniSerializer::Query.build(:root, arguments: {}, schema: {
           resource: PostResource,
           members: [
-            { name: :id, arguments: {}, schema: nil },
-            { name: :post_title, arguments: {}, schema: nil },
-            { name: :post_content, arguments: {}, schema: nil }
+            OmniSerializer::Query.build(:id),
+            OmniSerializer::Query.build(:post_title),
+            OmniSerializer::Query.build(:post_content)
           ]
-        })
+        }))
+        expect(params_normalizer.call(PostResource, include: nil, fields: nil, filter: nil, page: nil, sort: nil))
+          .to eq(OmniSerializer::Query.build(:root, arguments: {}, schema: {
+            resource: PostResource,
+            members: [
+              OmniSerializer::Query.build(:id),
+              OmniSerializer::Query.build(:post_title),
+              OmniSerializer::Query.build(:post_content)
+            ]
+          }))
+        expect(params_normalizer.call(PostResource, include: '', fields: {}, filter: {}, page: {}, sort: ''))
+          .to eq(OmniSerializer::Query.build(:root, arguments: { sort: {} }, schema: {
+            resource: PostResource,
+            members: [
+              OmniSerializer::Query.build(:id),
+              OmniSerializer::Query.build(:post_title),
+              OmniSerializer::Query.build(:post_content)
+            ]
+          }))
+        expect(params_normalizer.call(PostResource, include: [], filter: [], page: [], sort: []))
+          .to eq(OmniSerializer::Query.build(:root, arguments: {}, schema: {
+            resource: PostResource,
+            members: [
+              OmniSerializer::Query.build(:id),
+              OmniSerializer::Query.build(:post_title),
+              OmniSerializer::Query.build(:post_content)
+            ]
+          }))
       end
+    end
 
-      specify do
-        expect(query).to eq(default_post_query)
-        expect(params_normalizer.call(PostResource, include: nil, fields: nil, filter: nil, sort: nil))
-          .to eq(default_post_query)
-        expect(params_normalizer.call(PostResource, include: '', sort: '')).to eq(default_post_query)
-        expect(params_normalizer.call(PostResource, include: [], sort: [])).to eq(default_post_query)
-      end
-
-      specify do
-        expect { params_normalizer.call(PostResource, fields: '') }
-          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: '`fields` parameter must be a mapping `{"type":"field1,field2"}`, given: `""`',
-            status: 400,
-            source: { parameter: 'fields' }
-          }))
-        expect { params_normalizer.call(PostResource, fields: { posts: 'invalid' }) }
-          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: 'Undefined member `invalid` for `posts`, ' \
-              'valid members are: `id`, `post-title`, `post-content`, `tag-names`',
-            status: 400,
-            source: { parameter: 'fields' }
-          }))
-        expect { params_normalizer.call(PostResource, include: 'post-author', fields: { comments: 'comment-body' }) }
-          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: 'Invalid type given: `comments`, valid types are: `posts`, `users`',
-            status: 400,
-            source: { parameter: 'fields' }
-          }))
-        expect { params_normalizer.call(PostResource, filter: '') }
-          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: '`filter` parameter must be a mapping, given: `""`',
-            status: 400,
-            source: { parameter: 'filter' }
-          }))
-      end
+    specify do
+      expect { params_normalizer.call(PostResource, fields: '') }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: '`fields` parameter must be a mapping `{"type":"field1,field2"}`, given: `""`',
+          status: 400,
+          source: { parameter: 'fields' }
+        }))
+      expect { params_normalizer.call(PostResource, fields: { posts: 'invalid' }) }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Undefined field `invalid` for `posts`, ' \
+            'valid fields are: `id`, `post-title`, `post-content`, `tag-names`',
+          status: 400,
+          source: { parameter: 'fields' }
+        }))
+      expect { params_normalizer.call(PostResource, include: 'post-author', fields: { comments: 'comment-body' }) }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Invalid type used for query: `comments`, applicable types are: `posts`, `users`',
+          status: 400,
+          source: { parameter: 'fields' }
+        }))
+      expect { params_normalizer.call(PostResource, filter: 'foo') }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Invalid filter parameter at `/`, must be a mapping, given: `"foo"`',
+          status: 400,
+          source: { parameter: 'filter' }
+        }))
+      expect { params_normalizer.call(PostResource, page: 'foo') }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Invalid page parameter at `/`, must be a mapping with keys: ' \
+            '`number`, `size`, `cursor`, `before`, `after`, given: `"foo"`',
+          status: 400,
+          source: { parameter: 'page' }
+        }))
+      expect { params_normalizer.call(PostResource, page: { number: 42, foo: 'bar' }) }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Invalid page key at `/`, allowed keys are: ' \
+            '`number`, `size`, `cursor`, `before`, `after`, given: `{"foo":"bar"}`',
+          status: 400,
+          source: { parameter: 'page' }
+        }))
+      expect { params_normalizer.call(PostResource, sort: 42) }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Invalid sort parameter at `/`, must be a comma-separated list of fields, given: `42`',
+          status: 400,
+          source: { parameter: 'sort' }
+        }))
     end
 
     context 'when include is given' do
@@ -562,7 +604,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root,
-          arguments: { filter: { post_title: 'foo', 'non-member': 'value' } }, schema: {
+          arguments: { filter: { post_title: 'foo', non_member: 'value' } }, schema: {
             resource: PostResource,
             members: [
               { name: :id, arguments: {}, schema: nil },
@@ -636,7 +678,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                     { name: :post_content, arguments: {}, schema: nil },
                     {
                       name: :active_comments,
-                      arguments: { filter: { comment_body: ['hello', {}], 'non-member': 'value' } },
+                      arguments: { filter: { comment_body: ['hello', {}], non_member: 'value' } },
                       schema: {
                         resource: CommentCollectionResource,
                         members: [
@@ -670,6 +712,101 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             } }
           ]
         }))
+      end
+    end
+
+    context 'when page is given' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          include: 'active-comments',
+          page: {
+            'number' => 2,
+            'size' => 10,
+            'active-comments' => {
+              'cursor' => '123',
+              'before' => '456',
+              'after' => '789'
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: { page: { number: 2, size: 10 } },
+          schema: {
+            resource: PostResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :post_title, arguments: {}, schema: nil },
+              { name: :post_content, arguments: {}, schema: nil },
+              {
+                name: :active_comments,
+                arguments: { page: { cursor: '123', before: '456', after: '789' } },
+                schema: {
+                  resource: CommentCollectionResource,
+                  members: [
+                    { name: :pagination, arguments: {}, schema: nil },
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: CommentResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :comment_body, arguments: {}, schema: nil }
+                      ]
+                    } }
+                  ]
+                }
+              }
+            ]
+          }
+        ))
+      end
+    end
+
+    context 'when sort is given' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          include: 'active-comments',
+          sort: [
+            'post-title,active-comments,-active-comments,-postTitle',
+            { 'active-comments' => '-comment-body,posts,commentAuthor' }
+          ]
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: { sort: { post_title: :desc, active_comments: :desc } },
+          schema: {
+            resource: PostResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :post_title, arguments: {}, schema: nil },
+              { name: :post_content, arguments: {}, schema: nil },
+              {
+                name: :active_comments,
+                arguments: { sort: { comment_body: :desc, posts: :asc, comment_author: :asc } },
+                schema: {
+                  resource: CommentCollectionResource,
+                  members: [
+                    { name: :pagination, arguments: {}, schema: nil },
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: CommentResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :comment_body, arguments: {}, schema: nil }
+                      ]
+                    } }
+                  ]
+                }
+              }
+            ]
+          }
+        ))
       end
     end
   end

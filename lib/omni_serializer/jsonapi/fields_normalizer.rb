@@ -51,7 +51,7 @@ class OmniSerializer::Jsonapi::FieldsNormalizer
 
   def invalid_type_error(type, type_map)
     OmniSerializer::JsonapiError.new(
-      detail: "Invalid type given: `#{type}`, valid types are: `#{type_map.keys.join('`, `')}`",
+      detail: "Invalid type used for query: `#{type}`, applicable types are: `#{type_map.keys.join('`, `')}`",
       status: 400,
       source: { parameter: 'fields' }
     )
@@ -61,7 +61,7 @@ class OmniSerializer::Jsonapi::FieldsNormalizer
     member_names = members_map.select { |_, m| m.is_a?(OmniSerializer::Resource::Member) }.keys
 
     OmniSerializer::JsonapiError.new(
-      detail: "Undefined member `#{field}` for `#{type}`, valid members are: `#{member_names.join('`, `')}`",
+      detail: "Undefined field `#{field}` for `#{type}`, valid fields are: `#{member_names.join('`, `')}`",
       status: 400,
       source: { parameter: 'fields' }
     )

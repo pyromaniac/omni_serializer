@@ -5,28 +5,51 @@ class OmniSerializer::Jsonapi::QueryBuilder
   extend Dry::Initializer
 
   DEFAULT_ATTRIBUTES = %i[id].freeze
+  DEFAULT_TYPE_EXTRACTOR = ->(name) { name.split(':', 2) }
 
-  option :key_formatter, OmniSerializer::Types::Interface(:call)
-  option :type_formatter, OmniSerializer::Types::Interface(:call)
-  option :type_extractor, OmniSerializer::Types::Interface(:call), default: proc { ->(name) { name.split(':', 2) } }
-  option :includes_normalizer, OmniSerializer::Types::Interface(:call),
-    default: proc { OmniSerializer::Jsonapi::IncludeNormalizer.new(key_formatter:, type_formatter:, type_extractor:) }
-  option :fields_normalizer, OmniSerializer::Types::Interface(:call),
-    default: proc { OmniSerializer::Jsonapi::FieldsNormalizer.new(key_formatter:, type_formatter:) }
-  option :filter_normalizer, OmniSerializer::Types::Interface(:call),
-    default: proc { OmniSerializer::Jsonapi::FilterNormalizer.new(key_formatter:, type_formatter:, type_extractor:) }
+  option :includes_normalizer, OmniSerializer::Types::Interface(:call)
+  option :fields_normalizer, OmniSerializer::Types::Interface(:call)
+  option :family_normalizers, OmniSerializer::Types::Hash.map(
+    OmniSerializer::Types::Symbol,
+    OmniSerializer::Types::Interface(:call)
+  )
 
-  def call(resource_class, include: [], fields: {}, filter: {}, sort: [], **)
+  def self.build(missing_key_formatter:, key_formatter:, type_formatter:, type_extractor: DEFAULT_TYPE_EXTRACTOR, **)
+    new(
+      includes_normalizer: OmniSerializer::Jsonapi::IncludeNormalizer
+        .new(key_formatter:, type_formatter:, type_extractor:),
+      fields_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer.new(key_formatter:, type_formatter:),
+      family_normalizers: {
+        filter: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+          'filter', key_formatter:, type_formatter:, type_extractor:,
+          leaf_normalizer: OmniSerializer::Jsonapi::FilterLeafNormalizer.new(missing_key_formatter:)
+        ),
+        sort: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+          'sort', key_formatter:, type_formatter:, type_extractor:,
+          leaf_normalizer: OmniSerializer::Jsonapi::SortLeafNormalizer.new(missing_key_formatter:, key_formatter:)
+        ),
+        page: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+          'page', key_formatter:, type_formatter:, type_extractor:,
+          leaf_normalizer: OmniSerializer::Jsonapi::PageLeafNormalizer.new(
+            allowed_keys: %i[number size cursor before after],
+            missing_key_formatter:
+          )
+        )
+      }
+    )
+  end
+
+  def call(resource_class, include: [], fields: {}, **params)
     includes_tree = includes_normalizer.call(resource_class, include)
     includes_map = build_includes_map(resource_class, includes_tree)
     fields = fields_normalizer.call(fields, included_resources: includes_map.keys)
-    filter_tree = filter_normalizer.call(resource_class, filter)
-    # sort_tree = normalize_sort(sort || [], resource_class, includes_map)
+    family_params = family_normalizers.to_h do |name, normalizer|
+      [name, normalizer.call(resource_class, params[name])]
+    end
 
-    arguments = filter_tree.key?([]) ? { filter: filter_tree[[]] } : {}
-    OmniSerializer::Query.new(name: :root, arguments:, schema: {
+    OmniSerializer::Query.new(name: :root, arguments: path_arguments(family_params, []), schema: {
       resource: resource_class,
-      members: query_level(resource_class, includes_tree:, includes_map:, fields:, filter_tree:)
+      members: query_level(resource_class, includes_tree:, includes_map:, fields:, family_params:)
     })
   end
 
@@ -38,6 +61,12 @@ class OmniSerializer::Jsonapi::QueryBuilder
       result[resource_class] |= [resource_class.members[name]]
       result.merge!(build_includes_map(association_resource, nested_includes)) { |_, one, two| one | two }
     end
+  end
+
+  def path_arguments(family_params, path)
+    family_normalizers.keys.filter_map do |name|
+      [name, family_params[name][path]] if family_params[name].key?(path)
+    end.to_h
   end
 
   def query_level(resource_class, includes_tree:, path: [], **query_options)
@@ -60,16 +89,15 @@ class OmniSerializer::Jsonapi::QueryBuilder
     end
   end
 
-  def query_associations(resource_class, includes_tree:, includes_map:, filter_tree:, path:, **query_options)
+  def query_associations(resource_class, includes_tree:, includes_map:, family_params:, path:, **query_options)
     return [] if includes_tree.nil?
 
     includes_map[resource_class].map do |association|
       current_path = resource_class.collection? ? path : [*path, [resource_class, association.name]]
-      filter_given = filter_tree.key?(current_path) && !resource_class.collection?
-      arguments = filter_given ? { filter: filter_tree[current_path] } : {}
+      arguments = resource_class.collection? ? {} : path_arguments(family_params, current_path)
       OmniSerializer::Query.new(name: association.name, arguments:,
         schema: association_schema(association, includes_tree:,
-          includes_map:, filter_tree:, path: current_path, **query_options))
+          includes_map:, family_params:, path: current_path, **query_options))
     end
   end
 
@@ -90,27 +118,4 @@ class OmniSerializer::Jsonapi::QueryBuilder
       }
     end
   end
-
-  # def normalize_sort(sort, root_resource, _query_resources)
-  #   sort = sort.split(',') if sort.is_a?(String)
-
-  #   (sort || []).each_with_object({}) do |path, result|
-  #     path = path.split('.') if path.is_a?(String)
-  #     direction = path.any? { |segment| segment.start_with?('-') } ? :desc : :asc
-  #     path = path.map { |segment| segment.delete_prefix('-') }
-
-  #     resource = root_resource
-  #     resource_chain = []
-  #     path.each.with_index do |segment, index|
-  #       member = resource_members(resource)[key_formatter.call(segment)]
-  #       if member.is_a?(OmniSerializer::Resource::Association)
-  #         resource = member.resolved_resource
-  #         resource_chain.push(member.name)
-  #       else
-  #         (result[resource_chain] ||= {})[path[index..].join('.')] = direction
-  #         break
-  #       end
-  #     end
-  #   end
-  # end
 end

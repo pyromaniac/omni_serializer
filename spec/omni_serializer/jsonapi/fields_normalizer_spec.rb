@@ -76,8 +76,8 @@ RSpec.describe OmniSerializer::Jsonapi::FieldsNormalizer do
 
       specify do
         expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-          detail: 'Undefined member `post_content` for `posts`, ' \
-            'valid members are: `id`, `post-title`, `post-content`, `tag-names`',
+          detail: 'Undefined field `post_content` for `posts`, ' \
+            'valid fields are: `id`, `post-title`, `post-content`, `tag-names`',
           status: 400,
           source: { parameter: 'fields' }
         }))

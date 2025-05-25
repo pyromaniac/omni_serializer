@@ -6,11 +6,13 @@ class OmniSerializer::NameFormatter
   option :inflector, OmniSerializer::Types::Interface(:camelize, :dasherize, :underscore, :singularize, :pluralize)
   option :casing, OmniSerializer::Types::Symbol.enum(:camel, :kebab, :pascal, :snake).optional, default: proc {}
   option :number, OmniSerializer::Types::Symbol.enum(:singular, :plural).optional, default: proc {}
+  option :symbolize, OmniSerializer::Types::Bool, default: proc { false }
 
   def call(value, number = self.number)
     return if value.nil?
 
-    transform_case(transform_number(value.to_s, number))
+    result = transform_case(transform_number(value.to_s, number))
+    symbolize ? result.to_sym : result
   end
 
   private

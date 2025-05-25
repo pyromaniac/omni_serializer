@@ -34,10 +34,15 @@ class OmniSerializer::Jsonapi
   option :type_formatter, OmniSerializer::Types::Interface(:call)
 
   def self.build(loaders:, key_formatter:, type_formatter:, **)
-    missing_key_formatter = OmniSerializer::NameFormatter.new(inflector: key_formatter.inflector, casing: :snake)
+    missing_key_formatter = OmniSerializer::NameFormatter.new(
+      inflector: key_formatter.inflector,
+      casing: :snake,
+      symbolize: true
+    )
 
     new(
-      query_builder: OmniSerializer::Jsonapi::QueryBuilder.new(key_formatter:, type_formatter:),
+      query_builder: OmniSerializer::Jsonapi::QueryBuilder
+        .build(missing_key_formatter:, key_formatter:, type_formatter:),
       evaluator: OmniSerializer::Evaluator.new(loaders:),
       deserializer: OmniSerializer::Jsonapi::Deserializer.new(missing_key_formatter:, key_formatter:, type_formatter:),
       key_formatter:,
