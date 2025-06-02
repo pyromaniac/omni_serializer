@@ -10,9 +10,10 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
   let(:type_formatter_options) { { casing: :kebab, number: :plural } }
 
   describe '#call' do
-    subject(:result) { deserializer.call(resource_class, data) }
+    subject(:result) { deserializer.call(resource_class, data:, included:) }
 
     let(:resource_class) { PostResource }
+    let(:included) { [] }
 
     context 'with invalid top-level type' do
       let(:data) { { type: 'Posts' } }
@@ -26,24 +27,24 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
       end
     end
 
-    context 'with malformed root data' do
+    context 'with malformed resource data' do
       let(:data) { { id: 42, type: 'posts' } }
 
       specify do
         expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-          detail: 'Malformed root data, should be an object with string `id` (optional), `type` and other members.',
+          detail: 'Malformed resource data, should be an object with string `id` (optional), `type` and other members.',
           status: 400,
           source: { pointer: '/data' }
         }))
       end
     end
 
-    context 'with missing root data' do
+    context 'with missing resource data' do
       let(:data) { nil }
 
       specify do
         expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-          detail: 'Malformed root data, should be an object with string `id` (optional), `type` and other members.',
+          detail: 'Malformed resource data, should be an object with string `id` (optional), `type` and other members.',
           status: 400,
           source: { pointer: '/data' }
         }))
@@ -126,16 +127,16 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
       let(:data) do
         {
           type: 'posts',
-          relationships: { 'non-existent': { data: { id: '42', type: 'users' } } }
+          relationships: { postAuthor: { data: { id: '42', type: 'users' } } }
         }
       end
 
       specify do
         expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-          detail: 'Relationship `non-existent` is not defined on `posts`, ' \
+          detail: 'Relationship `postAuthor` is not defined on `posts`, ' \
             'valid relationships are: `post-author`, `active-comments`, `taggings`, `tags`.',
           status: 400,
-          source: { pointer: '/data/relationships/non-existent' }
+          source: { pointer: '/data/relationships/postAuthor' }
         }))
       end
     end
@@ -189,13 +190,13 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         let(:data) do
           {
             type: 'posts',
-            relationships: { 'post-author': { data: { id: '42', type: 'post-authors' } } }
+            relationships: { 'post-author': { data: { id: '42', type: 'Users' } } }
           }
         end
 
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
-            detail: 'Invalid type given: `post-authors`, valid types are: `users`.',
+            detail: 'Invalid type given: `Users`, valid types are: `users`.',
             status: 409,
             source: { pointer: '/data/relationships/post-author/data/type' }
           }))
@@ -213,10 +214,80 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Malformed data for `post-author` relationship, ' \
-              'should be an object with string `id` and `type` or null.',
+              'should be an object with string `id` (or `lid`) and `type` or null.',
             status: 400,
             source: { pointer: '/data/relationships/post-author/data' }
           }))
+        end
+      end
+
+      context 'with linked data' do
+        let(:included) do
+          [{
+            id: '42',
+            type: 'users',
+            attributes: { 'user-name': 'John Doe' },
+            relationships: { comments: { data: [{ id: '43', type: 'comments' }] } }
+          }]
+        end
+
+        specify do
+          expect(result).to have_attributes(
+            params: { post_author: { id: '42', user_name: 'John Doe', comment_ids: ['43'] } },
+            pointers: {
+              [] => '/data',
+              [:id] => '/data/id',
+              [:type] => '/data/type',
+              %i[post_author] => '/included/0',
+              %i[post_author id] => '/included/0/id',
+              %i[post_author user_name] => '/included/0/attributes/user-name',
+              %i[post_author comment_ids] => '/included/0/relationships/comments/data',
+              [:post_author, :comment_ids, 0] => '/included/0/relationships/comments/data/0/id'
+            }
+          )
+        end
+      end
+
+      context 'with LID linked data' do
+        let(:data) do
+          {
+            type: 'posts',
+            relationships: { 'post-author': { data: { lid: '42', type: 'users' } } }
+          }
+        end
+
+        specify do
+          expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Linked resource data for lid `42` not found in `included`.',
+            status: 400,
+            source: { pointer: '/data/relationships/post-author/data' }
+          }))
+        end
+
+        context 'with included data' do
+          let(:included) do
+            [{
+              lid: '42',
+              type: 'users',
+              attributes: { 'user-name': 'John Doe' },
+              relationships: { comments: { data: [{ id: '43', type: 'comments' }] } }
+            }]
+          end
+
+          specify do
+            expect(result).to have_attributes(
+              params: { post_author: { user_name: 'John Doe', comment_ids: ['43'] } },
+              pointers: {
+                [] => '/data',
+                [:id] => '/data/id',
+                [:type] => '/data/type',
+                %i[post_author] => '/included/0',
+                %i[post_author user_name] => '/included/0/attributes/user-name',
+                %i[post_author comment_ids] => '/included/0/relationships/comments/data',
+                [:post_author, :comment_ids, 0] => '/included/0/relationships/comments/data/0/id'
+              }
+            )
+          end
         end
       end
     end
@@ -301,10 +372,82 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Malformed data for `taggable` relationship, ' \
-              'should be an object with string `id` and `type` or null.',
+              'should be an object with string `id` (or `lid`) and `type` or null.',
             status: 400,
             source: { pointer: '/data/relationships/taggable/data' }
           }))
+        end
+      end
+
+      context 'with linked data' do
+        let(:included) do
+          [{
+            id: '42',
+            type: 'posts',
+            attributes: { 'post-title': 'Hello, world!' },
+            relationships: { 'active-comments': { data: [{ id: '43', type: 'comments' }] } }
+          }]
+        end
+
+        specify do
+          expect(result).to have_attributes(
+            params: { taggable: { id: '42', type: 'Post', post_title: 'Hello, world!', active_comment_ids: ['43'] } },
+            pointers: {
+              [] => '/data',
+              [:id] => '/data/id',
+              [:type] => '/data/type',
+              %i[taggable] => '/included/0',
+              %i[taggable id] => '/included/0/id',
+              %i[taggable type] => '/included/0/type',
+              %i[taggable post_title] => '/included/0/attributes/post-title',
+              %i[taggable active_comment_ids] => '/included/0/relationships/active-comments/data',
+              [:taggable, :active_comment_ids, 0] => '/included/0/relationships/active-comments/data/0/id'
+            }
+          )
+        end
+      end
+
+      context 'with LID linked data' do
+        let(:data) do
+          {
+            type: 'taggings',
+            relationships: { taggable: { data: { lid: '42', type: 'posts' } } }
+          }
+        end
+
+        specify do
+          expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Linked resource data for lid `42` not found in `included`.',
+            status: 400,
+            source: { pointer: '/data/relationships/taggable/data' }
+          }))
+        end
+
+        context 'with included data' do
+          let(:included) do
+            [{
+              lid: '42',
+              type: 'posts',
+              attributes: { 'post-title': 'Hello, world!' },
+              relationships: { 'active-comments': { data: [{ id: '43', type: 'comments' }] } }
+            }]
+          end
+
+          specify do
+            expect(result).to have_attributes(
+              params: { taggable: { type: 'Post', post_title: 'Hello, world!', active_comment_ids: ['43'] } },
+              pointers: {
+                [] => '/data',
+                [:id] => '/data/id',
+                [:type] => '/data/type',
+                %i[taggable] => '/included/0',
+                %i[taggable type] => '/included/0/type',
+                %i[taggable post_title] => '/included/0/attributes/post-title',
+                %i[taggable active_comment_ids] => '/included/0/relationships/active-comments/data',
+                [:taggable, :active_comment_ids, 0] => '/included/0/relationships/active-comments/data/0/id'
+              }
+            )
+          end
         end
       end
     end
@@ -315,10 +458,12 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         {
           type: 'posts',
           relationships: {
-            'active-comments': { data: [
-              { id: '42', type: 'comments' },
-              { id: '43', type: 'comments' }
-            ] }
+            'active-comments': {
+              data: [
+                { id: '42', type: 'comments' },
+                { id: '43', type: 'comments' }
+              ]
+            }
           }
         }
       end
@@ -386,7 +531,7 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Malformed data for `active-comments` relationship, ' \
-              'should be an array of objects with string `id` and `type`.',
+              'should be an array of objects with string `id` (or `lid`) and `type`.',
             status: 400,
             source: { pointer: '/data/relationships/active-comments/data' }
           }))
@@ -404,10 +549,87 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Malformed data for `active-comments` relationship datum, ' \
-              'should be an object with string `id` and `type`.',
+              'should be an object with string `id` (or `lid`) and `type`.',
             status: 400,
             source: { pointer: '/data/relationships/active-comments/data/1' }
           }))
+        end
+      end
+
+      context 'with included data' do
+        let(:included) do
+          [{
+            id: '42',
+            type: 'comments',
+            attributes: { 'comment-body': 'Lorem ipsum' }
+          }]
+        end
+
+        specify do
+          expect(result).to have_attributes(
+            params: { active_comments: [{ id: '42', comment_body: 'Lorem ipsum' }, { id: '43' }] },
+            pointers: {
+              [] => '/data',
+              [:id] => '/data/id',
+              [:type] => '/data/type',
+              %i[active_comments] => '/data/relationships/active-comments/data',
+              [:active_comments, 0] => '/included/0',
+              [:active_comments, 0, :id] => '/included/0/id',
+              [:active_comments, 0, :comment_body] => '/included/0/attributes/comment-body',
+              [:active_comments, 1] => '/data/relationships/active-comments/data/1',
+              [:active_comments, 1, :id] => '/data/relationships/active-comments/data/1/id'
+            }
+          )
+        end
+      end
+
+      context 'with LID linked data' do
+        let(:data) do
+          {
+            type: 'posts',
+            relationships: {
+              'active-comments': {
+                data: [
+                  { lid: '42', type: 'comments' },
+                  { id: '43', type: 'comments' }
+                ]
+              }
+            }
+          }
+        end
+
+        specify do
+          expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Linked resource data for lid `42` not found in `included`.',
+            status: 400,
+            source: { pointer: '/data/relationships/active-comments/data/0' }
+          }))
+        end
+
+        context 'with included data' do
+          let(:included) do
+            [{
+              lid: '42',
+              type: 'comments',
+              attributes: { 'comment-body': 'Lorem ipsum' }
+            }]
+          end
+
+          specify do
+            expect(result).to have_attributes(
+              params: { active_comments: [{ comment_body: 'Lorem ipsum' }, { id: '43' }] },
+              pointers: {
+                [] => '/data',
+                [:id] => '/data/id',
+                [:type] => '/data/type',
+                %i[active_comments] => '/data/relationships/active-comments/data',
+                [:active_comments, 0] => '/included/0',
+                [:active_comments, 0, :comment_body] => '/included/0/attributes/comment-body',
+                [:active_comments, 1] => '/data/relationships/active-comments/data/1',
+                [:active_comments, 1, :id] => '/data/relationships/active-comments/data/1/id'
+              }
+            )
+          end
         end
       end
     end
@@ -498,7 +720,7 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Malformed data for `taggables` relationship, ' \
-              'should be an array of objects with string `id` and `type`.',
+              'should be an array of objects with string `id` (or `lid`) and `type`.',
             status: 400,
             source: { pointer: '/data/relationships/taggables/data' }
           }))
@@ -523,10 +745,101 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
             detail: 'Malformed data for `taggables` relationship datum, ' \
-              'should be an object with string `id` and `type`.',
+              'should be an object with string `id` (or `lid`) and `type`.',
             status: 400,
             source: { pointer: '/data/relationships/taggables/data/1' }
           }))
+        end
+      end
+
+      context 'with included data' do
+        let(:included) do
+          [{
+            id: '42',
+            type: 'posts',
+            attributes: { 'post-title': 'Hello, world!' }
+          }]
+        end
+
+        specify do
+          expect(result).to have_attributes(
+            params: {
+              taggables: [
+                { id: '42', type: 'Post', post_title: 'Hello, world!' },
+                { id: '43', type: 'Comment' }
+              ]
+            },
+            pointers: {
+              [] => '/data',
+              [:id] => '/data/id',
+              [:type] => '/data/type',
+              %i[taggables] => '/data/relationships/taggables/data',
+              [:taggables, 0] => '/included/0',
+              [:taggables, 0, :id] => '/included/0/id',
+              [:taggables, 0, :type] => '/included/0/type',
+              [:taggables, 0, :post_title] => '/included/0/attributes/post-title',
+              [:taggables, 1] => '/data/relationships/taggables/data/1',
+              [:taggables, 1, :id] => '/data/relationships/taggables/data/1/id',
+              [:taggables, 1, :type] => '/data/relationships/taggables/data/1/type'
+            }
+          )
+        end
+      end
+
+      context 'with LID linked data' do
+        let(:data) do
+          {
+            type: 'tags',
+            relationships: {
+              taggables: {
+                data: [
+                  { lid: '42', type: 'posts' },
+                  { id: '43', type: 'comments' }
+                ]
+              }
+            }
+          }
+        end
+
+        specify do
+          expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Linked resource data for lid `42` not found in `included`.',
+            status: 400,
+            source: { pointer: '/data/relationships/taggables/data/0' }
+          }))
+        end
+
+        context 'with included data' do
+          let(:included) do
+            [{
+              lid: '42',
+              type: 'posts',
+              attributes: { 'post-title': 'Hello, world!' }
+            }]
+          end
+
+          specify do
+            expect(result).to have_attributes(
+              params: {
+                taggables: [
+                  { type: 'Post', post_title: 'Hello, world!' },
+                  { id: '43', type: 'Comment' }
+                ]
+              },
+              pointers: {
+                [] => '/data',
+                [:id] => '/data/id',
+                [:type] => '/data/type',
+                %i[taggables] => '/data/relationships/taggables/data',
+                [:taggables, 0] => '/included/0',
+                [:taggables, 0, :type] => '/included/0/type',
+                [:taggables, 0, :post_title] => '/included/0/attributes/post-title',
+                [:taggables, 1] => '/data/relationships/taggables/data/1',
+                [:taggables, 1, :id] => '/data/relationships/taggables/data/1/id',
+                [:taggables, 1, :type] => '/data/relationships/taggables/data/1/type'
+              }
+            )
+          end
         end
       end
     end

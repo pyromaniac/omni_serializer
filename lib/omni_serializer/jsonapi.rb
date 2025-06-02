@@ -62,7 +62,7 @@ class OmniSerializer::Jsonapi
   end
 
   def deserialize(params, with:)
-    deserializer.call(with, params[:data])
+    deserializer.call(with, **params)
   end
 
   def errors(*errors)
