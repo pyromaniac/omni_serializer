@@ -33,7 +33,7 @@ class OmniSerializer::Jsonapi
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :type_formatter, OmniSerializer::Types::Interface(:call)
 
-  def self.build(loaders:, key_formatter:, type_formatter:, **)
+  def self.build(key_formatter:, type_formatter:, loaders:, **)
     missing_key_formatter = OmniSerializer::NameFormatter.new(
       inflector: key_formatter.inflector,
       casing: :snake,

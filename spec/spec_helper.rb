@@ -33,12 +33,14 @@ RSpec.configure do |config|
 
   config.before(:suite) do
     DatabaseCleaner.clean_with(:truncation)
-    DatabaseCleaner.strategy = :truncation
+    DatabaseCleaner.strategy = :transaction
   end
 
   config.around do |example|
     DatabaseCleaner.cleaning do
-      example.run
+      OmniSerializer::Dataloader.with_promises_executor(:immediate) do
+        example.run
+      end
     end
   end
 end
