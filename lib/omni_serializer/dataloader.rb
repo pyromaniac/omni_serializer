@@ -4,8 +4,7 @@ require 'concurrent'
 
 # Dataloader pattern implementation for OmniSerializer using Concurrent::Promises.
 class OmniSerializer::Dataloader
-  def initialize(executor = :io, &resolver)
-    @executor = executor
+  def initialize(&resolver)
     @resolver = resolver
     @mutex = Mutex.new
     flush
@@ -35,7 +34,7 @@ class OmniSerializer::Dataloader
   def flush
     keys = @keys.dup
     @keys = Concurrent::Array.new
-    @promise = Concurrent::Promises.delay_on(@executor, self, &:resolve)
+    @promise = Concurrent::Promises.delay(self, &:resolve)
     keys
   end
 end
