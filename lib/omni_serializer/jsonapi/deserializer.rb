@@ -200,13 +200,16 @@ class OmniSerializer::Jsonapi::Deserializer
   def flat_collection_relationship_params(association, data, pointer:)
     id_key = :"#{missing_key_formatter.call(association.name, :singular)}_ids"
 
-    [
-      { id_key => data.map { |datum| datum[:id] } },
-      {
-        [id_key] => pointer,
-        **data.size.times.to_h { |index| [[id_key, index], "#{pointer}/#{index}/id"] }
-      }
-    ]
+    params = { id_key => data.map { |datum| datum[:id] } }
+    params[association.name] = [] if data.empty?
+
+    pointers = {
+      [id_key] => pointer,
+      **data.size.times.to_h { |index| [[id_key, index], "#{pointer}/#{index}/id"] }
+    }
+    pointers[[association.name]] = pointer if data.empty?
+
+    [params, pointers]
   end
 
   def singular_relationship_params(association, association_types, data, included:, pointer:)

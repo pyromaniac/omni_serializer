@@ -407,6 +407,32 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
         end
       end
 
+      context 'with linked data empty relationship' do
+        let(:included) do
+          [{
+            id: '42',
+            type: 'posts',
+            relationships: { 'active-comments': { data: [] } }
+          }]
+        end
+
+        specify do
+          expect(result).to have_attributes(
+            params: { taggable: { id: '42', type: 'Post', active_comment_ids: [], active_comments: [] } },
+            pointers: {
+              [] => '/data',
+              [:id] => '/data/id',
+              [:type] => '/data/type',
+              %i[taggable] => '/included/0',
+              %i[taggable id] => '/included/0/id',
+              %i[taggable type] => '/included/0/type',
+              %i[taggable active_comment_ids] => '/included/0/relationships/active-comments/data',
+              %i[taggable active_comments] => '/included/0/relationships/active-comments/data'
+            }
+          )
+        end
+      end
+
       context 'with LID linked data' do
         let(:data) do
           {
@@ -492,12 +518,13 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
 
         specify do
           expect(result).to have_attributes(
-            params: { active_comment_ids: [] },
+            params: { active_comment_ids: [], active_comments: [] },
             pointers: {
               [] => '/data',
               [:id] => '/data/id',
               [:type] => '/data/type',
-              [:active_comment_ids] => '/data/relationships/active-comments/data'
+              [:active_comment_ids] => '/data/relationships/active-comments/data',
+              [:active_comments] => '/data/relationships/active-comments/data'
             }
           )
         end
