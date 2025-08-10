@@ -6,7 +6,7 @@
 class OmniSerializer::Jsonapi::FamilyNormalizer
   extend Dry::Initializer
 
-  param :family_name, OmniSerializer::Types::String
+  param :param_key, OmniSerializer::Types::Coercible::String
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :type_formatter, OmniSerializer::Types::Interface(:call)
   option :type_extractor, OmniSerializer::Types::Interface(:call)
@@ -87,10 +87,10 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
 
   def invalid_type_error(name, type, association_types)
     OmniSerializer::JsonapiError.new(
-      detail: "Invalid type `#{type}` for #{family_name} on `#{name}`, " \
+      detail: "Invalid type `#{type}` for #{param_key} on `#{name}`, " \
         "valid types are: `#{association_types.keys.join('`, `')}`",
       status: 400,
-      source: { parameter: family_name }
+      source: { parameter: param_key }
     )
   end
 end

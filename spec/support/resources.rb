@@ -49,9 +49,9 @@ class CommentCollectionResource < PaginatedCollectionResource
 
   collection resource: 'CommentResource' do
     if parent
-      loaders.collection(filtered_scope, PARENT_FOREIGN_KEY_MAPPING.fetch(parent.class)).load(parent.id)
+      loaders.collection(paginated_scope, PARENT_FOREIGN_KEY_MAPPING.fetch(parent.class)).load(parent.id)
     else
-      filtered_scope
+      paginated_scope
     end
   end
 
@@ -67,6 +67,10 @@ class CommentCollectionResource < PaginatedCollectionResource
 
   def filtered_scope
     arguments.dig(:filter, :active) ? object.active : object
+  end
+
+  def paginated_scope
+    filtered_scope.limit(per_page).offset(per_page * (current_page - 1))
   end
 end
 

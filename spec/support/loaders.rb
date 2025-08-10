@@ -14,7 +14,15 @@ class BaseLoader
 
   def self.cache_key(scope, *, **)
     if scope?(scope)
-      [scope.klass, scope.values.deep_transform_values { |value| scope?(value) ? value.values : value }, *, **]
+      [scope.klass, scope.values.deep_transform_values do |value|
+        if value.is_a?(ActiveRecord::Relation::FromClause)
+          value.value.values
+        elsif scope?(value)
+          value.values
+        else
+          value
+        end
+      end, *, **]
     else
       [scope, {}, *, **]
     end
@@ -27,7 +35,7 @@ class BaseLoader
   private
 
   def keys_scope(keys)
-    basic_scope.where(path.reverse.inject(keys) { |value, key| { key => value } })
+    basic_scope.where(path.reverse.inject(keys.uniq) { |value, key| { key => value } })
   end
 
   def basic_scope

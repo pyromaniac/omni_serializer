@@ -102,7 +102,7 @@ RSpec.describe OmniSerializer::Jsonapi do
     end
 
     specify do
-      expect(serializer.serialize([comment1, comment2], with: CommentCollectionResource)).to eq({
+      expect(serializer.serialize(Comment.where(id: [comment1, comment2]), with: CommentCollectionResource)).to eq({
         data: [{
           id: comment1.id.to_s,
           type: 'comments',
@@ -352,6 +352,60 @@ RSpec.describe OmniSerializer::Jsonapi do
               relationships: { 'comments' => {}, 'posts' => {} }
             }]
           })
+      end
+    end
+
+    context 'with relationship given' do
+      specify do
+        expect(serializer.serialize(post1, with: PostResource, relationship: 'post_author')).to eq({
+          data: {
+            id: user1.id.to_s,
+            type: 'users',
+            attributes: { 'user_name' => 'User 1' },
+            relationships: { 'comments' => {}, 'posts' => {} }
+          }
+        })
+      end
+    end
+
+    context 'with collection relationship given' do
+      specify do
+        expect(serializer.serialize(
+          post1,
+          with: PostResource,
+          relationship: 'active_comments',
+          params: { include: 'post', page: { number: 2, size: 1 } }
+        )).to eq({
+          data: [{
+            id: comment2.id.to_s,
+            type: 'comments',
+            attributes: { 'comment_body' => 'Comment 2' },
+            relationships: {
+              'comment_author' => {},
+              'post' => { data: { id: post1.id.to_s, type: 'posts' } },
+              'taggings' => {},
+              'tags' => {}
+            }
+          }],
+          meta: { 'pagination' => { 'total_count' => 2, 'total_pages' => 2, 'current_page' => 2 } },
+          included: [{
+            id: post1.id.to_s,
+            type: 'posts',
+            attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
+            relationships: { 'post_author' => {}, 'active_comments' => {}, 'taggings' => {}, 'tags' => {} }
+          }]
+        })
+      end
+    end
+
+    context 'with invalid relationship' do
+      specify do
+        expect { serializer.serialize(post1, with: PostResource, relationship: 'postAuthor') }
+          .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Invalid relationship `postAuthor` for `posts`, valid relationships ' \
+              'are: `post_author`, `active_comments`, `taggings`, `tags`',
+            status: 404
+          }))
       end
     end
   end

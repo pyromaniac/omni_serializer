@@ -51,9 +51,11 @@ class OmniSerializer::Jsonapi
     )
   end
 
-  def serialize(value, with:, params: {}, context: {})
-    query = query_builder.call(with, **params)
+  def serialize(value, with:, relationship: nil, params: {}, context: {})
+    relationship = normalize_relationship(with, relationship) if relationship
+    query = query_builder.call(with, relationship, **params)
     data = evaluator.call(value, query, context:)
+    data = data.values[relationship] if relationship
     result = { data: render_data(data) }
     meta = collection_meta(data)
     result[:meta] = meta unless meta.empty?
@@ -76,6 +78,16 @@ class OmniSerializer::Jsonapi
   end
 
   private
+
+  def normalize_relationship(resource_class, name)
+    transformed_associations = resource_class.members.values.grep(OmniSerializer::Resource::Association)
+      .index_by { |member| key_formatter.call(member.name) }
+    relationship = transformed_associations[name]
+
+    raise invalid_relationship_error(name, resource_class, transformed_associations) unless relationship
+
+    relationship.name
+  end
 
   def render_included(data)
     included = collect_included(data).except(*top_level_linkage(data))
@@ -219,5 +231,13 @@ class OmniSerializer::Jsonapi
     return value unless member in OmniSerializer::Resource::Member(transform_keys: true)
 
     OmniSerializer::Utils.deep_transform_keys(value) { |key| key_formatter.call(key) }
+  end
+
+  def invalid_relationship_error(name, resource_class, transformed_associations)
+    OmniSerializer::JsonapiError.new(
+      detail: "Invalid relationship `#{name}` for `#{type_formatter.call(resource_class.type)}`, " \
+        "valid relationships are: `#{transformed_associations.keys.join('`, `')}`",
+      status: 404
+    )
   end
 end

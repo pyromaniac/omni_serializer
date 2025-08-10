@@ -12,10 +12,11 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
   let(:type_formatter_options) { { casing: :kebab, number: :plural } }
 
   describe '#call' do
-    subject(:query) { params_normalizer.call(resource, **options) }
+    subject(:query) { params_normalizer.call(resource, relationship, **options) }
 
     let(:resource) { PostResource }
     let(:options) { {} }
+    let(:relationship) { nil }
 
     context 'when some empty params are given' do
       specify do
@@ -875,6 +876,69 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                         members: [
                           { name: :id, arguments: {}, schema: nil },
                           { name: :comment_body, arguments: {}, schema: nil }
+                        ]
+                      } }
+                    ]
+                  } }
+                ]
+              } }
+            ]
+          }))
+      end
+    end
+
+    context 'when relationship is given' do
+      let(:resource) { PostResource }
+      let(:relationship) { :active_comments }
+      let(:options) do
+        {
+          include: 'comment-author,tags,post',
+          fields: {
+            tags: 'tag-name',
+            posts: 'id,tag-names,taggings',
+            comments: 'comment-body,tags,post'
+          },
+          filter: { nested: 42, tags: { 'tag-name' => 'foo' } },
+          sort: ['comment-body,post', { 'tags' => '-tag-name' }],
+          page: { 'number' => 2, 'size' => 10, 'tags' => { 'cursor' => '123' } },
+          'omni:meta': ['current-page,-pagination']
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root,
+          arguments: {}, schema: {
+            resource: PostResource,
+            members: [
+              { name: :active_comments, arguments: {
+                filter: { nested: 42 },
+                sort: { comment_body: :asc, post: :asc },
+                page: { number: 2, size: 10 }
+              }, schema: {
+                resource: CommentCollectionResource,
+                members: [
+                  { name: :current_page, arguments: {}, schema: nil },
+                  { name: :to_a, arguments: {}, schema: {
+                    resource: CommentResource,
+                    members: [
+                      { name: :id, arguments: {}, schema: nil },
+                      { name: :comment_body, arguments: {}, schema: nil },
+                      { name: :tags, arguments: {
+                        filter: { tag_name: 'foo' },
+                        sort: { tag_name: :desc },
+                        page: { cursor: '123' }
+                      }, schema: {
+                        resource: TagResource,
+                        members: [
+                          { name: :id, arguments: {}, schema: nil },
+                          { name: :tag_name, arguments: {}, schema: nil }
+                        ]
+                      } },
+                      { name: :post, arguments: {}, schema: {
+                        resource: PostResource,
+                        members: [
+                          { name: :id, arguments: {}, schema: nil },
+                          { name: :tag_names, arguments: {}, schema: nil }
                         ]
                       } }
                     ]

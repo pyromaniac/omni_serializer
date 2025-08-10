@@ -2,10 +2,10 @@
 
 RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
   subject(:family_normalizer) do
-    described_class.new(family_name, key_formatter:, type_formatter:, type_extractor:, leaf_normalizer:)
+    described_class.new(param_key, key_formatter:, type_formatter:, type_extractor:, leaf_normalizer:)
   end
 
-  let(:family_name) { 'foobar' }
+  let(:param_key) { 'foobar' }
   let(:key_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **key_formatter_options) }
   let(:key_formatter_options) { { casing: :kebab } }
   let(:type_formatter) { OmniSerializer::NameFormatter.new(inflector: Dry::Inflector.new, **type_formatter_options) }

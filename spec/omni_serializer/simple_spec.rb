@@ -74,7 +74,7 @@ RSpec.describe OmniSerializer::Simple do
           only: [],
           include: { post: { only: :post_title } }
         })).to eq({ 'post' => { 'postTitle' => 'Post 1' } })
-        expect(serializer.serialize([comment1, comment2], with: CommentCollectionResource, params: {
+        expect(serializer.serialize(Comment.where(id: [comment1, comment2]), with: CommentCollectionResource, params: {
           include: { post: { only: :post_title, include: :post_author } }
         })).to eq({
           'pagination' => { 'currentPage' => 1, 'totalCount' => 2, 'totalPages' => 1 },

@@ -6,67 +6,86 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
   DEFAULT_ATTRIBUTES = %i[id].freeze
   DEFAULT_TYPE_EXTRACTOR = ->(name) { name.split(':', 2) }
+  META_KEY = :'omni:meta'
 
-  option :includes_normalizer, OmniSerializer::Types::Interface(:call)
+  option :include_normalizer, OmniSerializer::Types::Interface(:call)
   option :fields_normalizer, OmniSerializer::Types::Interface(:call)
   option :meta_normalizer, OmniSerializer::Types::Interface(:call)
-  option :family_normalizers, OmniSerializer::Types::Hash.map(
-    OmniSerializer::Types::Symbol,
-    OmniSerializer::Types::Interface(:call)
-  )
+  option :family_normalizers, OmniSerializer::Types::Array.of(OmniSerializer::Types::Interface(:call))
 
   def self.build(missing_key_formatter:, key_formatter:, type_formatter:, type_extractor: DEFAULT_TYPE_EXTRACTOR, **)
     new(
-      includes_normalizer: OmniSerializer::Jsonapi::IncludeNormalizer
+      include_normalizer: OmniSerializer::Jsonapi::IncludeNormalizer
         .new(key_formatter:, type_formatter:, type_extractor:),
       fields_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer.new(key_formatter:, type_formatter:),
       meta_normalizer: OmniSerializer::Jsonapi::FamilyNormalizer.new(
-        OmniSerializer::Jsonapi::MetaLeafNormalizer::PARAM_KEY, key_formatter:, type_formatter:, type_extractor:,
-        leaf_normalizer: OmniSerializer::Jsonapi::MetaLeafNormalizer.new(key_formatter:)
+        META_KEY, key_formatter:, type_formatter:, type_extractor:,
+        leaf_normalizer: OmniSerializer::Jsonapi::MetaLeafNormalizer.new(META_KEY, key_formatter:)
       ),
-      family_normalizers: {
-        filter: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+      family_normalizers: [
+        OmniSerializer::Jsonapi::FamilyNormalizer.new(
           'filter', key_formatter:, type_formatter:, type_extractor:,
           leaf_normalizer: OmniSerializer::Jsonapi::FilterLeafNormalizer.new(missing_key_formatter:)
         ),
-        sort: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+        OmniSerializer::Jsonapi::FamilyNormalizer.new(
           'sort', key_formatter:, type_formatter:, type_extractor:,
           leaf_normalizer: OmniSerializer::Jsonapi::SortLeafNormalizer.new(missing_key_formatter:, key_formatter:)
         ),
-        page: OmniSerializer::Jsonapi::FamilyNormalizer.new(
+        OmniSerializer::Jsonapi::FamilyNormalizer.new(
           'page', key_formatter:, type_formatter:, type_extractor:,
           leaf_normalizer: OmniSerializer::Jsonapi::PageLeafNormalizer.new(
             allowed_keys: %i[number size cursor before after],
             missing_key_formatter:
           )
         )
-      }
+      ]
     )
   end
 
-  def call(resource_class, **)
+  def call(resource_class, relationship = nil, **)
+    root_resource_class = resource_class
+    resource_class, relationship = relationship_resource(resource_class, relationship) if relationship
     query_params = normalize_query_params(resource_class, **)
 
-    OmniSerializer::Query.new(name: :root, arguments: path_arguments(query_params[:family_params], []), schema: {
-      resource: resource_class,
-      members: query_level(resource_class, **query_params)
-    })
+    if relationship
+      OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+        resource: root_resource_class,
+        members: [
+          OmniSerializer::Query.new(
+            name: relationship.name,
+            arguments: path_arguments(query_params[:family_params], []),
+            schema: {
+              resource: resource_class,
+              members: query_level(resource_class, **query_params)
+            }
+          )
+        ]
+      })
+    else
+      OmniSerializer::Query.new(name: :root, arguments: path_arguments(query_params[:family_params], []), schema: {
+        resource: resource_class,
+        members: query_level(resource_class, **query_params)
+      })
+    end
   end
 
   private
 
+  def relationship_resource(resource_class, relationship)
+    relationship = resource_class.members[relationship]
+    [relationship.resolved_resource, relationship]
+  end
+
   def normalize_query_params(resource_class, include: [], fields: {}, **params)
-    includes_tree = includes_normalizer.call(resource_class, include)
+    includes_tree = include_normalizer.call(resource_class, include)
     includes_map = build_includes_map(resource_class, includes_tree)
 
     {
       includes_tree:,
       includes_map:,
       fields: fields_normalizer.call(fields, included_resources: includes_map.keys),
-      meta: meta_normalizer.call(resource_class, params[OmniSerializer::Jsonapi::MetaLeafNormalizer::PARAM_KEY.to_sym]),
-      family_params: family_normalizers.to_h do |name, normalizer|
-        [name, normalizer.call(resource_class, params[name])]
-      end
+      meta: meta_normalizer.call(resource_class, params[meta_normalizer.param_key.to_sym]),
+      family_params: normalize_family_params(resource_class, **params)
     }
   end
 
@@ -78,9 +97,17 @@ class OmniSerializer::Jsonapi::QueryBuilder
     end
   end
 
+  def normalize_family_params(resource_class, **params)
+    family_normalizers.to_h do |normalizer|
+      key = normalizer.param_key.to_sym
+      [key, normalizer.call(resource_class, params[key])]
+    end
+  end
+
   def path_arguments(family_params, path)
-    family_normalizers.keys.filter_map do |name|
-      [name, family_params[name][path]] if family_params[name].key?(path)
+    family_normalizers.filter_map do |normalizer|
+      key = normalizer.param_key.to_sym
+      [key, family_params[key][path]] if family_params[key].key?(path)
     end.to_h
   end
 

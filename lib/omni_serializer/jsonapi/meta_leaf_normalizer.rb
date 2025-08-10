@@ -4,8 +4,7 @@
 class OmniSerializer::Jsonapi::MetaLeafNormalizer
   extend Dry::Initializer
 
-  PARAM_KEY = 'omni:meta'
-
+  param :param_key, OmniSerializer::Types::Coercible::String
   option :key_formatter, OmniSerializer::Types::Interface(:call)
 
   def call(parent, value, path:)
@@ -47,27 +46,27 @@ class OmniSerializer::Jsonapi::MetaLeafNormalizer
 
   def invalid_meta_error(value, path)
     OmniSerializer::JsonapiError.new(
-      detail: "Invalid #{PARAM_KEY} parameter at `/#{path.join('/')}`, must be " \
+      detail: "Invalid #{param_key} parameter at `/#{path.join('/')}`, must be " \
         "a comma-separated list of fields, given: `#{value.to_json}`",
       status: 400,
-      source: { parameter: PARAM_KEY }
+      source: { parameter: param_key }
     )
   end
 
   def invalid_meta_target_error(path)
     OmniSerializer::JsonapiError.new(
-      detail: "Invalid #{PARAM_KEY} parameter at `/#{path.join('/')}`, must be applied to a collection resource",
+      detail: "Invalid #{param_key} parameter at `/#{path.join('/')}`, must be applied to a collection resource",
       status: 400,
-      source: { parameter: PARAM_KEY }
+      source: { parameter: param_key }
     )
   end
 
   def invalid_meta_member_error(name, path, transformed_meta)
     OmniSerializer::JsonapiError.new(
-      detail: "Undefined #{PARAM_KEY} `#{name}` at `/#{path.join('/')}`, valid #{PARAM_KEY} " \
+      detail: "Undefined #{param_key} `#{name}` at `/#{path.join('/')}`, valid #{param_key} " \
         "fields are: `#{transformed_meta.keys.join('`, `')}`",
       status: 400,
-      source: { parameter: PARAM_KEY }
+      source: { parameter: param_key }
     )
   end
 end
