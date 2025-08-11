@@ -69,34 +69,16 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
         it { is_expected.to eq([] => { post_title: { _leaf: %w[foo bar], _on: :post_title } }) }
       end
 
+      context 'when value is a hash' do
+        let(:param) { { 'post-title' => { 'value.gt' => 'foo' } } }
+
+        it { is_expected.to eq([] => { post_title: { _leaf: { 'value.gt' => 'foo' }, _on: :post_title } }) }
+      end
+
       context 'when member is not defined' do
         let(:param) { { 'postTitle' => 'foo' } }
 
         it { is_expected.to eq([] => { _leaf: { 'postTitle' => 'foo' } }) }
-      end
-    end
-
-    context 'when param on defined member with nested param' do
-      let(:param) { { 'post-title' => { 'eq' => 'foo' } } }
-
-      it { is_expected.to eq([] => { post_title: { _leaf: { 'eq' => 'foo' }, _on: :post_title } }) }
-
-      context 'with dot-separated path' do
-        let(:param) { { 'post-title.eq' => 'foo' } }
-
-        it { is_expected.to eq([] => { post_title: { _leaf: { 'eq' => 'foo' }, _on: :post_title } }) }
-      end
-
-      context 'with dot-separated path with dot-separated param' do
-        let(:param) { { 'post-title.eq.value' => 'foo' } }
-
-        it { is_expected.to eq([] => { post_title: { _leaf: { 'eq' => { 'value' => 'foo' } }, _on: :post_title } }) }
-      end
-
-      context 'when member is not defined' do
-        let(:param) { { 'postTitle' => { 'eq.value' => 'foo' } } }
-
-        it { is_expected.to eq([] => { _leaf: { 'postTitle' => { 'eq' => { 'value' => 'foo' } } } }) }
       end
     end
 
@@ -129,6 +111,16 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
         end
       end
 
+      context 'when param is a hash' do
+        let(:param) { { 'active-comments' => { 'comment-body.eq' => 'hello' } } }
+
+        specify do
+          expect(result).to eq(
+            [[PostResource, :active_comments]] => { _leaf: { 'comment-body.eq' => 'hello' } }
+          )
+        end
+      end
+
       context 'when param is an array with accociation hashes' do
         let(:param) { ['foo', { 'active-comments' => 42 }, 'bar', { 'post-author' => 43 }] }
 
@@ -137,38 +129,6 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
             [] => { _leaf: 'bar', _on: 'PostResource' },
             [[PostResource, :active_comments]] => { _leaf: 42, _on: 'CommentCollectionResource' },
             [[PostResource, :post_author]] => { _leaf: 43, _on: 'UserResource' }
-          )
-        end
-      end
-
-      context 'with dot-separated path' do
-        let(:param) { { 'post-author.user-name' => 'Bruce Wayne' } }
-
-        specify do
-          expect(result).to eq(
-            [[PostResource, :post_author]] => { user_name: { _leaf: 'Bruce Wayne', _on: :user_name } }
-          )
-        end
-      end
-
-      context 'with dot-separated path with param' do
-        let(:param) { { 'post-author.user-name.eq' => 'Bruce Wayne' } }
-
-        specify do
-          is_expected.to eq(
-            [[PostResource, :post_author]] => { user_name: { _leaf: { 'eq' => 'Bruce Wayne' }, _on: :user_name } }
-          )
-        end
-      end
-
-      context 'with dot-separated path with param and dot-separated path' do
-        let(:param) { { 'post-author.user-name' => { 'eq.value' => 'Bruce Wayne' } } }
-
-        specify do
-          expect(result).to eq(
-            [[PostResource, :post_author]] => {
-              user_name: { _leaf: { 'eq' => { 'value' => 'Bruce Wayne' } }, _on: :user_name }
-            }
           )
         end
       end
@@ -185,76 +145,22 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
         it { is_expected.to eq([[PostResource, :post_author]] => { _leaf: 42, _on: 'UserResource' }) }
       end
 
-      context 'when scalar param directly on association with dot-separated path' do
+      context 'when dot-separated param key includes association' do
         let(:param) { { 'active-comments.comment-author' => 42 } }
 
         specify do
-          expect(result).to eq([
-            [PostResource, :active_comments],
-            [CommentResource, :comment_author]
-          ] => { _leaf: 42, _on: 'UserResource' })
-        end
-      end
-    end
-
-    context 'when param on deep association' do
-      let(:param) { { 'post-author.comments' => { 'comment-body' => 'hello' } } }
-
-      specify do
-        expect(result).to eq(
-          [[PostResource, :post_author], [UserResource, :comments]] => {
-            comment_body: { _leaf: 'hello', _on: :comment_body }
-          }
-        )
-      end
-
-      context 'with collection member association' do
-        let(:param) { { 'active-comments.comment-author' => { 'user-name' => 'Bruce Wayne' } } }
-
-        specify do
-          expect(result).to eq([
-            [PostResource, :active_comments],
-            [CommentResource, :comment_author]
-          ] => { user_name: { _leaf: 'Bruce Wayne', _on: :user_name } })
-        end
-      end
-    end
-
-    context 'with mergeable paths' do
-      let(:param) { { 'post-title.eq' => 42, 'post-title.value' => 43 } }
-
-      it { is_expected.to eq([] => { post_title: { _leaf: { 'eq' => 42, 'value' => 43 }, _on: :post_title } }) }
-
-      context 'when param on deep association' do
-        let(:param) { { 'post-author' => { 'user-name.value' => 43, 'user-name.eq' => 44 } } }
-
-        specify do
-          expect(result).to eq(
-            [[PostResource, :post_author]] => {
-              user_name: { _leaf: { 'value' => 43, 'eq' => 44 }, _on: :user_name }
-            }
-          )
-        end
-      end
-
-      context 'when deep associations are in array' do
-        let(:param) { { 'active-comments.comment-body.eq.value' => 42, 'active-comments.comment-body' => 43 } }
-
-        specify do
-          expect(result).to eq(
-            [[PostResource, :active_comments]] => { comment_body: { _leaf: 43, _on: :comment_body } }
-          )
+          expect(result).to eq([] => { _leaf: { 'active-comments.comment-author' => 42 } })
         end
       end
     end
 
     context 'when conflicting values are given' do
-      let(:param) { { 'post-title.eq' => 42, 'post-title.eq.value' => 43 } }
+      let(:param) { { 'post-title' => { 'eq' => 42, 'eq.value' => 43 } } }
 
-      it { is_expected.to eq([] => { post_title: { _leaf: { 'eq' => { 'value' => 43 } }, _on: :post_title } }) }
+      it { is_expected.to eq([] => { post_title: { _leaf: { 'eq' => 42, 'eq.value' => 43 }, _on: :post_title } }) }
     end
 
-    context 'when param onlymorphic associations' do
+    context 'with polymorphic associations' do
       let(:resource_class) { TagResource }
       let(:param) { { 'taggables' => { 'post-title' => 'value' } } }
 
@@ -270,20 +176,22 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
       context 'when fields for all types are used' do
         let(:param) do
           {
-            'taggables.tags.name' => 'value1',
-            'taggables.post-author.user-name' => 'value2',
-            'taggables.post-title' => 'value3',
-            'taggables.comment-body' => 'value4',
-            'taggables.postAuthor' => 'value5'
+            'taggables' => {
+              'tags' => { 'name' => 'value1' },
+              'post-author' => [{ 'user-name' => 'value2' }],
+              'post-title' => 'value3',
+              'comment-body' => 'value4',
+              'postAuthor' => 'value5'
+            }
           }
         end
 
         specify do
-          expect(p(result)).to eq(
+          expect(result).to eq(
             [[TagResource, :taggables], [CommentResource, :tags]] => { _leaf: { 'name' => 'value1' } },
             [[TagResource, :taggables], [PostResource, :tags]] => { _leaf: { 'name' => 'value1' } },
             [[TagResource, :taggables], [PostResource, :post_author]] => {
-              user_name: { _leaf: 'value2', _on: :user_name }
+              _leaf: [{ 'user-name' => 'value2' }], _on: 'UserResource'
             },
             [[TagResource, :taggables]] => {
               post_title: { _leaf: 'value3', _on: :post_title },
@@ -295,7 +203,7 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
       end
 
       context 'when param on deep association' do
-        let(:param) { { 'taggables.post-author' => { 'user-name' => 'value' } } }
+        let(:param) { { 'taggables' => { 'post-author' => { 'user-name' => 'value' } } } }
 
         specify do
           expect(result).to eq(
@@ -308,7 +216,7 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
       end
 
       context 'when param on deep association with type specified' do
-        let(:param) { { 'taggables:posts.post-author' => { 'user-name' => 'value' } } }
+        let(:param) { { 'taggables:posts' => { 'post-author' => { 'user-name' => 'value' } } } }
 
         specify do
           expect(result).to eq([[TagResource, :taggables], [PostResource, :post_author]] => {
@@ -321,31 +229,13 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
         let(:param) do
           {
             'taggables:posts' => { 'post-title' => 'value1' },
-            'taggables:comments' => { 'comment-body' => 'value2' }
-          }
-        end
-
-        specify do
-          expect(result).to eq([[TagResource, :taggables]] => {
-            post_title: { _leaf: 'value1', _on: :post_title },
-            comment_body: { _leaf: 'value2', _on: :comment_body }
-          })
-        end
-      end
-
-      context 'when param on deep association with all types specified' do
-        let(:param) do
-          {
-            'taggables:posts.post-author' => { 'user-name' => 'value1' },
-            'taggables:comments.comment-author' => { 'user-name' => 'value2' }
+            'taggables:comments' => { 'comment-author' => { 'user-name' => 'value2' } }
           }
         end
 
         specify do
           expect(result).to eq(
-            [[TagResource, :taggables], [PostResource, :post_author]] => {
-              user_name: { _leaf: 'value1', _on: :user_name }
-            },
+            [[TagResource, :taggables]] => { post_title: { _leaf: 'value1', _on: :post_title } },
             [[TagResource, :taggables], [CommentResource, :comment_author]] => {
               user_name: { _leaf: 'value2', _on: :user_name }
             }
@@ -354,7 +244,7 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
       end
 
       context 'with invalid type' do
-        let(:param) { { 'taggables:Posts.post-author' => { 'user-name' => 'value' } } }
+        let(:param) { { 'taggables:Posts' => { 'post-author' => 'value' } } }
 
         specify do
           expect { result }.to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {

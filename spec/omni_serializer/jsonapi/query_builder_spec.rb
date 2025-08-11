@@ -38,7 +38,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
             ]
           }))
         expect(params_normalizer.call(PostResource, include: '', fields: {}, filter: {}, page: {}, sort: ''))
-          .to eq(OmniSerializer::Query.build(:root, arguments: { sort: {} }, schema: {
+          .to eq(OmniSerializer::Query.build(:root, arguments: {}, schema: {
             resource: PostResource,
             members: [
               OmniSerializer::Query.build(:id),
@@ -685,10 +685,9 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
         {
           include: 'posts.active-comments,comments',
           filter: {
-            'posts.active-comments': { 'comment-body' => ['hello'] },
             posts: {
               'post-title': 'foobar',
-              'active-comments': { 'comment-body': [{}], 'non-member': 'value' }
+              'active-comments': { 'comment-body.eq': ['hello'], 'non-member': 'value' }
             }
           }
         }
@@ -712,7 +711,7 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                     { name: :post_content, arguments: {}, schema: nil },
                     {
                       name: :active_comments,
-                      arguments: { filter: { comment_body: ['hello', {}], non_member: 'value' } },
+                      arguments: { filter: { comment_body: { eq: ['hello'] }, non_member: 'value' } },
                       schema: {
                         resource: CommentCollectionResource,
                         members: [

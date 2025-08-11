@@ -13,34 +13,16 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
   option :leaf_normalizer, OmniSerializer::Types::Interface(:call)
 
   def call(resource_class, family)
-    params_trees = Array.wrap(family).map { |params| build_params_tree(params) }
-    params_trees.map { |params| normalize_params_tree(resource_class, params) }
+    Array.wrap(family.presence)
+      .map { |params| normalize_params_tree(resource_class, params) }
       .inject({}) { |result, chain| OmniSerializer::Utils.deep_merge(result, chain) }
   end
 
   private
 
-  # Turns hashes like { 'foo.bar' => { 'moo.baz' => 42 } }
-  # or { 'foo.bar.moo' => { 'baz' => 42 } }
-  # or { 'foo.bar.moo.baz' => 42 }
-  # or { 'foo' => { 'bar.moo.baz' => 42 } }
-  # or { 'foo.bar' => { 'moo' { 'baz' => 42 } } }
-  # into { 'foo' => { 'bar' => { 'moo' => { 'baz' => 42 } } } }
-  def build_params_tree(params)
-    return params unless params.is_a?(Hash)
-
-    chains = params.map do |path, value|
-      path = path.to_s.split('.') if path.is_a?(String) || path.is_a?(Symbol)
-      value = OmniSerializer::Utils.deep_transform_keys(build_params_tree(value), &:to_s)
-      path.reverse.inject(value) { |result, name| { name.to_s => result } }
-    end
-
-    chains.inject({}) { |result, chain| OmniSerializer::Utils.deep_merge(result, chain) }
-  end
-
   def normalize_params_tree(resource_class, nested_params, path: [])
     if nested_params.is_a?(Hash)
-      param_trees(resource_class, nested_params, path:).group_by(&:first).transform_values do |pairs|
+      param_trees(resource_class, nested_params.stringify_keys, path:).group_by(&:first).transform_values do |pairs|
         values = pairs.map(&:last)
         values.many? ? values.inject({}, :merge) : values.first
       end
