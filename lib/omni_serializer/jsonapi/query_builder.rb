@@ -31,12 +31,10 @@ class OmniSerializer::Jsonapi::QueryBuilder
           'sort', key_formatter:, type_formatter:, type_extractor:,
           leaf_normalizer: OmniSerializer::Jsonapi::SortLeafNormalizer.new(missing_key_formatter:, key_formatter:)
         ),
-        OmniSerializer::Jsonapi::FamilyNormalizer.new(
+        OmniSerializer::Jsonapi::PageNormalizer.new(
           'page', key_formatter:, type_formatter:, type_extractor:,
-          leaf_normalizer: OmniSerializer::Jsonapi::PageLeafNormalizer.new(
-            allowed_keys: %i[number size cursor before after],
-            missing_key_formatter:
-          )
+          allowed_keys: %i[number size cursor before after],
+          missing_key_formatter:
         )
       ]
     )
