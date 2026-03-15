@@ -4,14 +4,19 @@
 class OmniSerializer::Simple::QueryBuilder
   extend Dry::Initializer
 
+  RESERVED_QUERY_OPTION_KEYS = %i[only except extra include collection types].freeze
+
   # @param resource_class [Class] The resource class to serialize.
-  # @param arguments [Hash] The arguments to use for serialization.
   # @param include [Symbol | Array<Symbol | Hash<Symbol, Hash>> | Hash<Symbol, Hash>]
   # @param only [Symbol | Array<Symbol | Hash<Symbol, Hash>> | Hash<Symbol, Hash>]
   # @param except [Symbol | Array<Symbol | Hash<Symbol, Hash>> | Hash<Symbol, Hash>]
   # @param extra [Symbol | Array<Symbol>]
+  # Any leftover keys are passed to the resource as query arguments.
   # @return [OmniSerializer::Query]
-  def call(resource_class, arguments: {}, **query_options)
+  def call(resource_class, **params)
+    params = normalize_params(params)
+    arguments, query_options = extract_arguments_and_query_options(params)
+
     OmniSerializer::Query.new(name: :root, arguments:, schema: {
       resource: resource_class,
       members: query_level(resource_class, **query_options)
@@ -60,17 +65,20 @@ class OmniSerializer::Simple::QueryBuilder
 
       next unless association.is_a?(OmniSerializer::Resource::Association)
 
-      OmniSerializer::Query.new(name:, arguments: query_options[:arguments] || {},
-        schema: association_schema(association, **query_options.except(:arguments)))
+      arguments, association_query_options = extract_arguments_and_query_options(query_options)
+
+      OmniSerializer::Query.new(name:, arguments:, schema: association_schema(association, **association_query_options))
     end
   end
 
   def association_schema(association, types: {}, **query_options)
     if association.polymorphic?
+      normalized_types = normalize_types(association, types)
+
       association.resolved_resource.transform_values do |resource_class|
         {
           resource: resource_class,
-          members: query_level(resource_class, **(types[resource_class] || query_options))
+          members: query_level(resource_class, **(normalized_types[resource_class] || query_options))
         }
       end
     else
@@ -85,6 +93,32 @@ class OmniSerializer::Simple::QueryBuilder
     resource_class.members.filter_map do |name, member|
       name if member in OmniSerializer::Resource::Member(expose: true)
     end
+  end
+
+  def normalize_params(params)
+    OmniSerializer::Utils.deep_transform_keys(params) do |key|
+      case key
+      when String, Symbol
+        key.to_sym
+      else
+        key
+      end
+    end
+  end
+
+  def normalize_types(association, types)
+    association.resource_classes.each_with_object({}) do |resource_class, result|
+      query_options = types[resource_class]
+      query_options ||= types[resource_class.type.to_sym] if resource_class.type
+      result[resource_class] = query_options if query_options
+    end
+  end
+
+  def extract_arguments_and_query_options(query_options)
+    [
+      query_options.except(*RESERVED_QUERY_OPTION_KEYS),
+      query_options.slice(*RESERVED_QUERY_OPTION_KEYS)
+    ]
   end
 
   def normalize_nested_params(members)

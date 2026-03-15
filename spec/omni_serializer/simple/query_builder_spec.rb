@@ -51,7 +51,7 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
           only: %i[post_title tags],
           except: :invalid,
           extra: :tag_names,
-          arguments: { foo: 42 },
+          foo: 42,
           include: %i[post_author active_comments]
         }
       end
@@ -90,7 +90,15 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
     context 'when include: is given' do
       let(:resource) { CommentResource }
       let(:options) do
-        { include: { post: { only: { post_title: { bar: 43 } }, include: :post_author, arguments: { foo: 42 } } } }
+        {
+          'include' => {
+            'post' => {
+              'only' => { 'post_title' => { 'bar' => 43 } },
+              'include' => 'post_author',
+              'foo' => 42
+            }
+          }
+        }
       end
 
       specify do
@@ -122,9 +130,9 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
       let(:options) do
         {
           include: {
-            post: { only: :post_title, include: :post_author, arguments: { foo: 42 } }
+            post: { only: :post_title, include: :post_author, foo: 42 }
           },
-          arguments: { bar: 43 }
+          bar: 43
         }
       end
 
@@ -164,10 +172,9 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
         {
           include: {
             active_comments: {
-              to_a: { extra: [:pagination] },
               only: [:id, { comment_body: { bar: 43 } }],
               include: { comment_author: { except: :user_name } },
-              arguments: { foo: 42 }
+              foo: 42
             }
           }
         }
@@ -195,6 +202,41 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
                   ]
                 } },
                 { name: :pagination, arguments: {}, schema: nil }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'with collection wrapper options on lower level' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          'include' => {
+            'active_comments' => {
+              'only' => 'comment_body',
+              'collection' => { 'only' => 'current_page' }
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :post_title, arguments: {}, schema: nil },
+            { name: :post_content, arguments: {}, schema: nil },
+            { name: :active_comments, arguments: {}, schema: {
+              resource: CommentCollectionResource,
+              members: [
+                { name: :to_a, arguments: {}, schema: {
+                  resource: CommentResource,
+                  members: [{ name: :comment_body, arguments: {}, schema: nil }]
+                } },
+                { name: :current_page, arguments: {}, schema: nil }
               ]
             } }
           ]
@@ -257,7 +299,13 @@ RSpec.describe OmniSerializer::Simple::QueryBuilder do
       let(:resource) { TagResource }
       let(:options) do
         {
-          include: { taggables: { arguments: { foo: 42 }, types: { PostResource => { include: :tags } }, except: :id } }
+          'include' => {
+            'taggables' => {
+              'foo' => 42,
+              'types' => { 'post' => { 'include' => 'tags' } },
+              'except' => 'id'
+            }
+          }
         }
       end
 

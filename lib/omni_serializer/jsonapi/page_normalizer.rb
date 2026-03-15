@@ -4,7 +4,7 @@
 class OmniSerializer::Jsonapi::PageNormalizer
   extend Dry::Initializer
 
-  RelationshipParams = Struct.new(:raw_name, :name, :type, :value, keyword_init: true)
+  RelationshipParams = Struct.new(:raw_name, :name, :type, :value)
 
   param :param_key, OmniSerializer::Types::Coercible::String
   option :key_formatter, OmniSerializer::Types::Interface(:call)

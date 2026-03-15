@@ -111,3 +111,6 @@ Style/ClassAndModuleChildren:
 
 Style/HashSyntax:
   EnforcedShorthandSyntax: always
+
+Style/OneClassPerFile:
+  Enabled: false

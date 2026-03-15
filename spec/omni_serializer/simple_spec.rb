@@ -65,6 +65,45 @@ RSpec.describe OmniSerializer::Simple do
       ])
     end
 
+    context 'when params include runtime arguments' do
+      before { Comment.create!(post: post1, body: 'Deleted comment', deleted_at: 1.day.ago) }
+
+      specify do
+        expect(serializer.serialize(Comment.all.order(:body), with: CommentCollectionResource, params: {
+          'page' => { 'number' => 2, 'size' => 1 },
+          'filter' => { 'active' => true },
+          'only' => 'comment_body'
+        })).to eq({
+          'pagination' => { 'current_page' => 2, 'total_count' => 3, 'total_pages' => 3 },
+          'collection' => [{ 'comment_body' => 'Comment 2' }]
+        })
+      end
+    end
+
+    context 'with nested collection wrapper options' do
+      specify do
+        expect(serializer.serialize(post1, with: PostResource, params: {
+          'include' => {
+            'active_comments' => {
+              'only' => 'comment_body',
+              'collection' => { 'only' => 'current_page' }
+            }
+          }
+        })).to eq({
+          'id' => post1.id,
+          'post_title' => 'Post 1',
+          'post_content' => { 'foo' => 42 },
+          'active_comments' => {
+            'current_page' => 1,
+            'collection' => [
+              { 'comment_body' => 'Comment 1' },
+              { 'comment_body' => 'Comment 2' }
+            ]
+          }
+        })
+      end
+    end
+
     context 'with collection serializer defined' do
       let(:key_formatter_options) { { casing: :camel } }
       let(:options) { { collection_key: :my_collection } }
