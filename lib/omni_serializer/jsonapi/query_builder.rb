@@ -6,10 +6,14 @@ class OmniSerializer::Jsonapi::QueryBuilder
 
   DEFAULT_ATTRIBUTES = %i[id].freeze
   DEFAULT_TYPE_EXTRACTOR = ->(name) { name.split(':', 2) }
+  EXCEPT_KEY = :'omni:except'
+  EXTRA_KEY = :'omni:extra'
   META_KEY = :'omni:meta'
 
   option :include_normalizer, OmniSerializer::Types::Interface(:call)
   option :fields_normalizer, OmniSerializer::Types::Interface(:call)
+  option :extra_normalizer, OmniSerializer::Types::Interface(:call)
+  option :except_normalizer, OmniSerializer::Types::Interface(:call)
   option :meta_normalizer, OmniSerializer::Types::Interface(:call)
   option :family_normalizers, OmniSerializer::Types::Array.of(OmniSerializer::Types::Interface(:call))
 
@@ -17,7 +21,12 @@ class OmniSerializer::Jsonapi::QueryBuilder
     new(
       include_normalizer: OmniSerializer::Jsonapi::IncludeNormalizer
         .new(key_formatter:, type_formatter:, type_extractor:),
-      fields_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer.new(key_formatter:, type_formatter:),
+      fields_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer
+        .new(param_key: 'fields', key_formatter:, type_formatter:),
+      extra_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer
+        .new(param_key: EXTRA_KEY, key_formatter:, type_formatter:),
+      except_normalizer: OmniSerializer::Jsonapi::FieldsNormalizer
+        .new(param_key: EXCEPT_KEY, key_formatter:, type_formatter:),
       meta_normalizer: OmniSerializer::Jsonapi::FamilyNormalizer.new(
         META_KEY, key_formatter:, type_formatter:, type_extractor:,
         leaf_normalizer: OmniSerializer::Jsonapi::MetaLeafNormalizer.new(META_KEY, key_formatter:)
@@ -77,14 +86,9 @@ class OmniSerializer::Jsonapi::QueryBuilder
   def normalize_query_params(resource_class, include: [], fields: {}, **params)
     includes_tree = include_normalizer.call(resource_class, include)
     includes_map = build_includes_map(resource_class, includes_tree)
+    included_resources = includes_map.keys
 
-    {
-      includes_tree:,
-      includes_map:,
-      fields: fields_normalizer.call(fields, included_resources: includes_map.keys),
-      meta: meta_normalizer.call(resource_class, params[meta_normalizer.param_key.to_sym]),
-      family_params: normalize_family_params(resource_class, **params)
-    }
+    build_query_params(resource_class, includes_tree:, includes_map:, included_resources:, fields:, params:)
   end
 
   def build_includes_map(resource_class, includes_tree)
@@ -116,21 +120,29 @@ class OmniSerializer::Jsonapi::QueryBuilder
       (includes_tree.nil? ? [] : query_associations(resource_class, path:, includes_tree:, **query_options))
   end
 
-  def query_members(resource_class, **)
-    members = resource_fields(resource_class, **)
-    members = resource_meta(members, **) if resource_class.collection?
+  def query_members(resource_class, extra:, except:, **query_options)
+    members = resource_fields(resource_class, **query_options)
+    extra_members = selected_members(resource_class, extra)
+    except_members = selected_members(resource_class, except)
+    members |= extra_members if extra_members
+    members -= except_members if except_members
+    members = resource_meta(members, **query_options) if resource_class.collection?
+    members = default_attributes(resource_class) | members
     members.map do |member|
       OmniSerializer::Query.new(name: member.name, arguments: {}, schema: nil)
     end
   end
 
+  def default_attributes(resource_class)
+    resource_class.members.values_at(*DEFAULT_ATTRIBUTES).compact
+  end
+
   def resource_fields(resource_class, fields:, **)
-    members = if fields.key?(resource_class)
+    if fields.key?(resource_class)
       fields[resource_class].grep(OmniSerializer::Resource::Member)
     else
       resource_class.members.values.grep(OmniSerializer::Resource::Member).select(&:expose)
     end
-    resource_class.members.values_at(*DEFAULT_ATTRIBUTES).compact | members
   end
 
   def resource_meta(members, meta:, path:, **)
@@ -142,17 +154,101 @@ class OmniSerializer::Jsonapi::QueryBuilder
     members
   end
 
-  def query_associations(resource_class, includes_map:, family_params:, fields:, path:, **)
-    associations = includes_map[resource_class]
-    associations &= fields[resource_class] if fields.key?(resource_class)
-    associations |= [resource_class.collection_member] if resource_class.collection?
-
-    associations.map do |association|
-      current_path = resource_class.collection? ? path : [*path, [resource_class, association.name]]
-      arguments = resource_class.collection? ? {} : path_arguments(family_params, current_path)
-      OmniSerializer::Query.new(name: association.name, arguments:,
-        schema: association_schema(association, includes_map:, family_params:, fields:, path: current_path, **))
+  def query_associations(resource_class, includes_map:, family_params:, fields:, path:, **query_options)
+    resource_associations(resource_class, includes_map:, fields:, **query_options).map do |association|
+      build_association_query(
+        association,
+        resource_class,
+        path,
+        includes_map:,
+        family_params:,
+        fields:,
+        **query_options
+      )
     end
+  end
+
+  def build_query_params(resource_class, includes_tree:, includes_map:, included_resources:, fields:, params:)
+    {
+      includes_tree:,
+      includes_map:,
+      fields: normalize_type_scoped_param(fields_normalizer, fields, included_resources),
+      extra: normalize_type_scoped_param(extra_normalizer, params, included_resources),
+      except: normalize_type_scoped_param(except_normalizer, params, included_resources),
+      meta: meta_normalizer.call(resource_class, params[meta_normalizer.param_key.to_sym]),
+      family_params: normalize_family_params(resource_class, **params)
+    }
+  end
+
+  def normalize_type_scoped_param(normalizer, value, included_resources)
+    value = value[normalizer.param_key.to_sym] if value.is_a?(Hash) && normalizer.param_key != 'fields'
+    normalizer.call(value, included_resources:)
+  end
+
+  def resource_associations(resource_class, includes_map:, fields:, **query_options)
+    associations = includes_map[resource_class]
+    associations = apply_field_associations(associations, resource_class, fields)
+    associations = apply_extra_associations(associations, selected_associations(resource_class, query_options[:extra]))
+    associations = apply_except_associations(associations,
+      selected_associations(resource_class, query_options[:except]))
+    associations |= [resource_class.collection_member] if resource_class.collection?
+    associations
+  end
+
+  def apply_field_associations(associations, resource_class, fields)
+    fields.key?(resource_class) ? associations & fields[resource_class] : associations
+  end
+
+  def apply_extra_associations(associations, extra_associations)
+    return associations unless extra_associations
+
+    associations | extra_associations
+  end
+
+  def apply_except_associations(associations, except_associations)
+    return associations unless except_associations
+
+    associations - except_associations
+  end
+
+  def build_association_query(association, resource_class, path, query_options)
+    current_path = association_path(resource_class, association, path)
+    arguments = association_arguments(resource_class, query_options[:family_params], current_path)
+
+    OmniSerializer::Query.new(
+      name: association.name,
+      arguments:,
+      schema: association_schema(
+        association,
+        includes_map: query_options[:includes_map],
+        family_params: query_options[:family_params],
+        fields: query_options[:fields],
+        path: current_path,
+        **query_options
+      )
+    )
+  end
+
+  def association_path(resource_class, association, path)
+    resource_class.collection? ? path : [*path, [resource_class, association.name]]
+  end
+
+  def association_arguments(resource_class, family_params, current_path)
+    resource_class.collection? ? {} : path_arguments(family_params, current_path)
+  end
+
+  def selected_members(resource_class, selector)
+    return unless selector
+    return unless selector.key?(resource_class)
+
+    selector[resource_class].grep(OmniSerializer::Resource::Member)
+  end
+
+  def selected_associations(resource_class, selector)
+    return unless selector
+    return unless selector.key?(resource_class)
+
+    selector[resource_class].grep(OmniSerializer::Resource::Association)
   end
 
   def association_schema(association, includes_tree:, **query_options)

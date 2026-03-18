@@ -117,6 +117,13 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
           status: 400,
           source: { parameter: 'omni:meta' }
         }))
+      expect { params_normalizer.call(PostResource, 'omni:extra': { posts: 'invalid' }) }
+        .to raise_error(an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+          detail: 'Undefined omni:extra `invalid` for `posts`, valid omni:extra fields are: ' \
+            '`id`, `post-title`, `post-content`, `tag-names`',
+          status: 400,
+          source: { parameter: 'omni:extra' }
+        }))
     end
 
     context 'when include is given' do
@@ -612,6 +619,68 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                 } }
               ]
             } }
+          ]
+        }))
+      end
+    end
+
+    context 'when omni:extra and omni:except are given' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          include: 'post-author',
+          fields: {
+            posts: 'post-title',
+            users: 'user-name'
+          },
+          'omni:extra': {
+            posts: 'tag-names,post-author',
+            users: 'post-tag-names'
+          },
+          'omni:except': {
+            posts: 'post-title'
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :tag_names, arguments: {}, schema: nil },
+            { name: :post_author, arguments: {}, schema: {
+              resource: UserResource,
+              members: [
+                { name: :id, arguments: {}, schema: nil },
+                { name: :user_name, arguments: {}, schema: nil },
+                { name: :post_tag_names, arguments: {}, schema: nil }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'when omni:except removes meta fields' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          fields: {
+            posts: 'post-title,tag-names'
+          },
+          'omni:except': {
+            posts: 'tag-names'
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :post_title, arguments: {}, schema: nil }
           ]
         }))
       end

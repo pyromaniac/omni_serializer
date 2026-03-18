@@ -101,6 +101,41 @@ RSpec.describe OmniSerializer::Jsonapi do
         }] })
     end
 
+    context 'with omni:extra and omni:except' do
+      before do
+        Tag.create!(name: 'Tag 1', posts: [post1, post2])
+        Tag.create!(name: 'Tag 2', posts: [post1])
+      end
+
+      specify do
+        expect(serializer.serialize(post1, with: PostResource, params: {
+          include: 'post_author',
+          'omni:extra': { posts: 'tag_names', users: 'post_tag_names' },
+          'omni:except': { posts: 'post_content' }
+        })).to eq({
+          data: {
+            id: post1.id.to_s,
+            type: 'posts',
+            attributes: { 'post_title' => 'Post 1' },
+            meta: { 'tag_names' => ['Tag 1', 'Tag 2'] },
+            relationships: {
+              'post_author' => { data: { id: user1.id.to_s, type: 'users' } },
+              'active_comments' => {},
+              'taggings' => {},
+              'tags' => {}
+            }
+          },
+          included: [{
+            id: user1.id.to_s,
+            type: 'users',
+            attributes: { 'user_name' => 'User 1' },
+            meta: { 'post_tag_names' => ['Tag 1', 'Tag 1', 'Tag 2'] },
+            relationships: { 'comments' => {}, 'posts' => {} }
+          }]
+        })
+      end
+    end
+
     specify do
       expect(serializer.serialize(Comment.where(id: [comment1, comment2]), with: CommentCollectionResource)).to eq({
         data: [{

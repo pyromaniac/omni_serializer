@@ -4,6 +4,7 @@
 class OmniSerializer::Jsonapi::FieldsNormalizer
   extend Dry::Initializer
 
+  option :param_key, OmniSerializer::Types::Coercible::String
   option :key_formatter, OmniSerializer::Types::Interface(:call)
   option :type_formatter, OmniSerializer::Types::Interface(:call)
 
@@ -42,9 +43,9 @@ class OmniSerializer::Jsonapi::FieldsNormalizer
 
   def invalid_fields_parameter_error(fields)
     OmniSerializer::JsonapiError.new(
-      detail: "`fields` parameter must be a mapping `{\"type\":\"field1,field2\"}`, given: `#{fields.to_json}`",
+      detail: "`#{param_key}` parameter must be a mapping `{\"type\":\"field1,field2\"}`, given: `#{fields.to_json}`",
       status: 400,
-      source: { parameter: 'fields' }
+      source: { parameter: param_key }
     )
   end
 
@@ -52,17 +53,22 @@ class OmniSerializer::Jsonapi::FieldsNormalizer
     OmniSerializer::JsonapiError.new(
       detail: "Invalid type used for query: `#{type}`, applicable types are: `#{type_map.keys.join('`, `')}`",
       status: 400,
-      source: { parameter: 'fields' }
+      source: { parameter: param_key }
     )
   end
 
   def invalid_field_error(type, field, members_map)
     member_names = members_map.select { |_, m| m.is_a?(OmniSerializer::Resource::Member) }.keys
+    detail = if param_key == 'fields'
+      "Undefined field `#{field}` for `#{type}`, valid fields are: `#{member_names.join('`, `')}`"
+    else
+      "Undefined #{param_key} `#{field}` for `#{type}`, valid #{param_key} fields are: `#{member_names.join('`, `')}`"
+    end
 
     OmniSerializer::JsonapiError.new(
-      detail: "Undefined field `#{field}` for `#{type}`, valid fields are: `#{member_names.join('`, `')}`",
+      detail:,
       status: 400,
-      source: { parameter: 'fields' }
+      source: { parameter: param_key }
     )
   end
 end
