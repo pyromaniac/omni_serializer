@@ -53,6 +53,17 @@ RSpec.describe OmniSerializer::Jsonapi::PageNormalizer do
       end
     end
 
+    context 'when dotted relationship path is given' do
+      let(:resource_class) { UserResource }
+      let(:page) { { 'posts.active-comments' => { number: 2, size: 10 } } }
+
+      it 'stores leaf at nested relationship path' do
+        expect(normalized).to eq(
+          [[UserResource, :posts], [PostResource, :active_comments]] => { number: 2, size: 10 }
+        )
+      end
+    end
+
     context 'when resource has reserved names' do
       before do
         stub_const(

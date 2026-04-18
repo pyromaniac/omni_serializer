@@ -149,8 +149,17 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
         let(:param) { { 'active-comments.comment-author' => 42 } }
 
         specify do
-          expect(result).to eq([] => { _leaf: { 'active-comments.comment-author' => 42 } })
+          expect(result).to eq([[PostResource, :active_comments], [CommentResource, :comment_author]] => {
+            _leaf: 42,
+            _on: 'UserResource'
+          })
         end
+      end
+
+      context 'when dot-separated param key includes association member' do
+        let(:param) { { 'post-author.user-name' => 'Bruce Wayne' } }
+
+        it { is_expected.to eq([] => { _leaf: { 'post-author.user-name' => 'Bruce Wayne' } }) }
       end
     end
 
@@ -217,6 +226,16 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
 
       context 'when param on deep association with type specified' do
         let(:param) { { 'taggables:posts' => { 'post-author' => { 'user-name' => 'value' } } } }
+
+        specify do
+          expect(result).to eq([[TagResource, :taggables], [PostResource, :post_author]] => {
+            user_name: { _leaf: 'value', _on: :user_name }
+          })
+        end
+      end
+
+      context 'when dot-separated param key includes deep association with type specified' do
+        let(:param) { { 'taggables:posts.post-author' => { 'user-name' => 'value' } } }
 
         specify do
           expect(result).to eq([[TagResource, :taggables], [PostResource, :post_author]] => {

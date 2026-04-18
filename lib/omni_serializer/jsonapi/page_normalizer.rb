@@ -48,22 +48,49 @@ class OmniSerializer::Jsonapi::PageNormalizer
   end
 
   def partition_params(nested_params, transformed_associations, display_path:)
-    leaf_params = {}
-    relationship_params = []
-
-    nested_params.stringify_keys.each do |raw_name, value|
-      name, type = type_extractor.call(raw_name)
-
-      if value.is_a?(Hash)
-        relationship_params << RelationshipParams.new(raw_name:, name:, type:, value:)
-      elsif !allowed_leaf_key?(name) && transformed_associations.key?(name)
-        normalize_leaf_value(value, [*display_path, raw_name])
-      else
-        leaf_params[name] = value
-      end
+    nested_params.stringify_keys.each_with_object([{}, []]) do |(raw_name, value), (leaf_params, relationship_params)|
+      partition_param(
+        raw_name,
+        value,
+        transformed_associations,
+        display_path:,
+        leaf_params:,
+        relationship_params:
+      )
     end
+  end
 
-    [leaf_params, relationship_params]
+  def partition_param(raw_name, value, transformed_associations, display_path:, leaf_params:, relationship_params:)
+    dotted_relationship = dotted_relationship_params(raw_name, value, transformed_associations)
+    return relationship_params << dotted_relationship if dotted_relationship
+
+    name, type = type_extractor.call(raw_name)
+    return relationship_params << RelationshipParams.new(raw_name:, name:, type:, value:) if value.is_a?(Hash)
+
+    validate_scalar_relationship_value(raw_name, name, value, transformed_associations, display_path:)
+    leaf_params[name] = value
+  end
+
+  def validate_scalar_relationship_value(raw_name, name, value, transformed_associations, display_path:)
+    return if allowed_leaf_key?(name) || !transformed_associations.key?(name)
+
+    normalize_leaf_value(value, [*display_path, raw_name])
+  end
+
+  def dotted_relationship_params(raw_name, value, transformed_associations)
+    relationship_name, nested_name = raw_name.split('.', 2)
+    return unless nested_name
+
+    raw_relationship_name = relationship_name
+    relationship_name, type = type_extractor.call(raw_relationship_name)
+    return unless transformed_associations.key?(relationship_name)
+
+    RelationshipParams.new(
+      raw_name: raw_relationship_name,
+      name: relationship_name,
+      type:,
+      value: { nested_name => value }
+    )
   end
 
   def leaf_map(query_path, leaf_params, display_path:)

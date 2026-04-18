@@ -817,6 +817,163 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
       end
     end
 
+    context 'when filter is given with dotted relationship key' do
+      let(:resource) { PostResource }
+      let(:options) { { filter: { 'post-author.id' => 'abc' } } }
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: { filter: { post_author: { id: 'abc' } } },
+          schema: {
+            resource: PostResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :post_title, arguments: {}, schema: nil },
+              { name: :post_content, arguments: {}, schema: nil }
+            ]
+          }
+        ))
+      end
+    end
+
+    context 'when filter path has scalar value' do
+      let(:resource) { UserResource }
+      let(:options) { { filter: { 'posts.active-comments' => 'hello' } } }
+
+      specify do
+        expect { query }.to raise_error(
+          an_instance_of(OmniSerializer::JsonapiError) & have_attributes(error_data: {
+            detail: 'Invalid filter parameter at `/posts.active-comments`, must be a mapping, given: `"hello"`',
+            status: 400,
+            source: { parameter: 'filter' }
+          })
+        )
+      end
+    end
+
+    context 'when filter is given for explicit dotted relationship path' do
+      let(:resource) { UserResource }
+      let(:options) do
+        {
+          include: 'posts.active-comments',
+          filter: {
+            'posts.active-comments' => { 'comment-body.eq' => ['hello'] }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: {},
+          schema: {
+            resource: UserResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :user_name, arguments: {}, schema: nil },
+              {
+                name: :posts,
+                arguments: {},
+                schema: {
+                  resource: PostCollectionResource,
+                  members: [
+                    { name: :pagination, arguments: {}, schema: nil },
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: PostResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :post_title, arguments: {}, schema: nil },
+                        { name: :post_content, arguments: {}, schema: nil },
+                        {
+                          name: :active_comments,
+                          arguments: { filter: { comment_body: { eq: ['hello'] } } },
+                          schema: {
+                            resource: CommentCollectionResource,
+                            members: [
+                              { name: :pagination, arguments: {}, schema: nil },
+                              { name: :to_a, arguments: {}, schema: {
+                                resource: CommentResource,
+                                members: [
+                                  { name: :id, arguments: {}, schema: nil },
+                                  { name: :comment_body, arguments: {}, schema: nil }
+                                ]
+                              } }
+                            ]
+                          }
+                        }
+                      ]
+                    } }
+                  ]
+                }
+              }
+            ]
+          }
+        ))
+      end
+    end
+
+    context 'when filter stays local at traversed relationship scope' do
+      let(:resource) { UserResource }
+      let(:options) do
+        {
+          include: 'posts.active-comments',
+          filter: {
+            posts: { 'active-comments.comment-body.eq' => ['hello'] }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: {},
+          schema: {
+            resource: UserResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :user_name, arguments: {}, schema: nil },
+              {
+                name: :posts,
+                arguments: { filter: { active_comments: { comment_body: { eq: ['hello'] } } } },
+                schema: {
+                  resource: PostCollectionResource,
+                  members: [
+                    { name: :pagination, arguments: {}, schema: nil },
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: PostResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :post_title, arguments: {}, schema: nil },
+                        { name: :post_content, arguments: {}, schema: nil },
+                        {
+                          name: :active_comments,
+                          arguments: {},
+                          schema: {
+                            resource: CommentCollectionResource,
+                            members: [
+                              { name: :pagination, arguments: {}, schema: nil },
+                              { name: :to_a, arguments: {}, schema: {
+                                resource: CommentResource,
+                                members: [
+                                  { name: :id, arguments: {}, schema: nil },
+                                  { name: :comment_body, arguments: {}, schema: nil }
+                                ]
+                              } }
+                            ]
+                          }
+                        }
+                      ]
+                    } }
+                  ]
+                }
+              }
+            ]
+          }
+        ))
+      end
+    end
+
     context 'when page is given' do
       let(:resource) { PostResource }
       let(:options) do
@@ -856,6 +1013,131 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                       members: [
                         { name: :id, arguments: {}, schema: nil },
                         { name: :comment_body, arguments: {}, schema: nil }
+                      ]
+                    } }
+                  ]
+                }
+              }
+            ]
+          }
+        ))
+      end
+    end
+
+    context 'when page is given for dotted relationship path' do
+      let(:resource) { UserResource }
+      let(:options) do
+        {
+          include: 'posts.active-comments',
+          page: {
+            'posts.active-comments' => {
+              'number' => 2,
+              'size' => 10
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: {},
+          schema: {
+            resource: UserResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :user_name, arguments: {}, schema: nil },
+              {
+                name: :posts,
+                arguments: {},
+                schema: {
+                  resource: PostCollectionResource,
+                  members: [
+                    { name: :pagination, arguments: {}, schema: nil },
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: PostResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :post_title, arguments: {}, schema: nil },
+                        { name: :post_content, arguments: {}, schema: nil },
+                        {
+                          name: :active_comments,
+                          arguments: { page: { number: 2, size: 10 } },
+                          schema: {
+                            resource: CommentCollectionResource,
+                            members: [
+                              { name: :pagination, arguments: {}, schema: nil },
+                              { name: :to_a, arguments: {}, schema: {
+                                resource: CommentResource,
+                                members: [
+                                  { name: :id, arguments: {}, schema: nil },
+                                  { name: :comment_body, arguments: {}, schema: nil }
+                                ]
+                              } }
+                            ]
+                          }
+                        }
+                      ]
+                    } }
+                  ]
+                }
+              }
+            ]
+          }
+        ))
+      end
+    end
+
+    context 'when sort is given for dotted relationship path' do
+      let(:resource) { UserResource }
+      let(:options) do
+        {
+          include: 'posts.active-comments',
+          sort: {
+            'posts.active-comments' => '-comment-body'
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(
+          name: :root,
+          arguments: {},
+          schema: {
+            resource: UserResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :user_name, arguments: {}, schema: nil },
+              {
+                name: :posts,
+                arguments: {},
+                schema: {
+                  resource: PostCollectionResource,
+                  members: [
+                    { name: :pagination, arguments: {}, schema: nil },
+                    { name: :to_a, arguments: {}, schema: {
+                      resource: PostResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :post_title, arguments: {}, schema: nil },
+                        { name: :post_content, arguments: {}, schema: nil },
+                        {
+                          name: :active_comments,
+                          arguments: { sort: { comment_body: :desc } },
+                          schema: {
+                            resource: CommentCollectionResource,
+                            members: [
+                              { name: :pagination, arguments: {}, schema: nil },
+                              { name: :to_a, arguments: {}, schema: {
+                                resource: CommentResource,
+                                members: [
+                                  { name: :id, arguments: {}, schema: nil },
+                                  { name: :comment_body, arguments: {}, schema: nil }
+                                ]
+                              } }
+                            ]
+                          }
+                        }
                       ]
                     } }
                   ]
@@ -944,6 +1226,56 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
                         members: [
                           { name: :id, arguments: {}, schema: nil },
                           { name: :comment_body, arguments: {}, schema: nil }
+                        ]
+                      } }
+                    ]
+                  } }
+                ]
+              } }
+            ]
+          }))
+      end
+    end
+
+    context 'when omni:meta is given for dotted relationship path' do
+      let(:resource) { UserResource }
+      let(:options) do
+        {
+          include: 'posts.active-comments',
+          'omni:meta': {
+            'posts.active-comments' => 'current-page,-pagination'
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root,
+          arguments: {}, schema: {
+            resource: UserResource,
+            members: [
+              { name: :id, arguments: {}, schema: nil },
+              { name: :user_name, arguments: {}, schema: nil },
+              { name: :posts, arguments: {}, schema: {
+                resource: PostCollectionResource,
+                members: [
+                  { name: :pagination, arguments: {}, schema: nil },
+                  { name: :to_a, arguments: {}, schema: {
+                    resource: PostResource,
+                    members: [
+                      { name: :id, arguments: {}, schema: nil },
+                      { name: :post_title, arguments: {}, schema: nil },
+                      { name: :post_content, arguments: {}, schema: nil },
+                      { name: :active_comments, arguments: {}, schema: {
+                        resource: CommentCollectionResource,
+                        members: [
+                          { name: :current_page, arguments: {}, schema: nil },
+                          { name: :to_a, arguments: {}, schema: {
+                            resource: CommentResource,
+                            members: [
+                              { name: :id, arguments: {}, schema: nil },
+                              { name: :comment_body, arguments: {}, schema: nil }
+                            ]
+                          } }
                         ]
                       } }
                     ]
