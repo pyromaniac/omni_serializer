@@ -304,6 +304,23 @@ RSpec.describe OmniSerializer::Resource do
       expect(resource.user).to eq(user)
     end
 
+    context 'when resource is a class' do
+      before do
+        stub_class(:post_resource, described_class) do
+          has_one :user, resource: UserResource
+        end
+      end
+
+      specify do
+        expect(PostResource.members).to match({
+          user: an_instance_of(described_class::Association) &
+            have_attributes(name: :user, collection: false, resource: UserResource)
+        })
+        expect(PostResource.members.fetch(:user).resolved_resource).to eq(UserResource)
+        expect(resource.user).to eq(user)
+      end
+    end
+
     context 'when block is given' do
       before do
         stub_class(:post_resource, described_class) do
@@ -393,6 +410,39 @@ RSpec.describe OmniSerializer::Resource do
       end
 
       specify { expect(resource.comments).to eq([comments.first]) }
+    end
+
+    context 'when resource map uses lazy references' do
+      let(:association) { PostResource.members.fetch(:taggables) }
+      let(:lazy_post) { Class.new }
+      let(:lazy_comment_resource) { Class.new(described_class) }
+      let(:different_post) { Class.new }
+      let(:different_comment_resource) { Class.new(described_class) }
+
+      before do
+        stub_class(:lazy_post_resource, described_class)
+        stub_class(:lazy_comment)
+
+        stub_class(:post_resource, described_class) do
+          has_many :taggables, resource: { 'LazyPost' => LazyPostResource, LazyComment => 'LazyCommentResource' } do
+            []
+          end
+        end
+      end
+
+      specify do
+        expect(association.resource).to eq('LazyPost' => LazyPostResource, LazyComment => 'LazyCommentResource')
+
+        stub_const('LazyPost', lazy_post)
+        stub_const('LazyCommentResource', lazy_comment_resource)
+
+        expect(association.resolved_resource).to eq(lazy_post => LazyPostResource, LazyComment => lazy_comment_resource)
+
+        stub_const('LazyPost', different_post)
+        stub_const('LazyCommentResource', different_comment_resource)
+
+        expect(association.resolved_resource).to eq(lazy_post => LazyPostResource, LazyComment => lazy_comment_resource)
+      end
     end
   end
 
