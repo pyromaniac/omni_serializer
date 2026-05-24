@@ -176,8 +176,7 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
       specify do
         expect(result).to eq(
           [[TagResource, :taggables]] => {
-            post_title: { _leaf: 'value', _on: :post_title },
-            _leaf: { 'post-title' => 'value' }
+            post_title: { _leaf: 'value', _on: :post_title }
           }
         )
       end
@@ -218,8 +217,7 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
           expect(result).to eq(
             [[TagResource, :taggables], [PostResource, :post_author]] => {
               user_name: { _leaf: 'value', _on: :user_name }
-            },
-            [[TagResource, :taggables]] => { _leaf: { 'post-author' => { 'user-name' => 'value' } } }
+            }
           )
         end
       end

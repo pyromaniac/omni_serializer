@@ -688,11 +688,27 @@ RSpec.describe OmniSerializer::Jsonapi::QueryBuilder do
 
     context 'when filter is given' do
       let(:resource) { PostResource }
-      let(:options) { { filter: { 'post-title': 'foo', 'active-comments': { nested: 42 }, 'non-member' => 'value' } } }
+      let(:options) do
+        {
+          filter: {
+            'post-title': 'foo',
+            'active-comments': { nested: 42 },
+            'non-member' => 'value',
+            'nested.shared.left' => '1',
+            'nested.shared.right' => '2'
+          }
+        }
+      end
 
       specify do
         expect(query).to eq(OmniSerializer::Query.new(name: :root,
-          arguments: { filter: { post_title: 'foo', non_member: 'value' } }, schema: {
+          arguments: {
+            filter: {
+              post_title: 'foo',
+              non_member: 'value',
+              nested: { shared: { left: '1', right: '2' } }
+            }
+          }, schema: {
             resource: PostResource,
             members: [
               { name: :id, arguments: {}, schema: nil },

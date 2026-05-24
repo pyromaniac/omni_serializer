@@ -26,11 +26,15 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
     if nested_params.is_a?(Hash)
       param_trees(resource_class, nested_params.stringify_keys, path:).group_by(&:first).transform_values do |pairs|
         values = pairs.map(&:last)
-        values.many? ? values.inject({}, :merge) : values.first
+        values.many? ? deep_merge_values(values) : values.first
       end
     else
       { [] => leaf_normalizer.call(resource_class, nested_params, path:) }
     end
+  end
+
+  def deep_merge_values(values)
+    values.inject({}) { |result, value| OmniSerializer::Utils.deep_merge(result, value) }
   end
 
   def param_trees(resource_class, nested_params, path:)
@@ -43,7 +47,7 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
   end
 
   def params_chain(resource_class, name, nested_params, transformed_members, path:)
-    nested_relationship = dotted_relationship_chain(resource_class, name, nested_params, path:)
+    nested_relationship = dotted_relationship_chain(resource_class, name, nested_params, path:) if name.include?('.')
     return nested_relationship if nested_relationship
 
     path = [*path, name]
@@ -130,16 +134,63 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
   end
 
   def association_params(resource_class, association, name, type, nested_params, **)
+    association_types, recognized_names, consumed_names =
+      association_param_context(association, name, type, nested_params)
+
+    association_types.flat_map do |resource_type, association_resource|
+      next [] if skipped_resource_type?(type, resource_type)
+
+      params = association_nested_params(association_resource, nested_params, consumed_names, recognized_names)
+      association_param_values(resource_class, association, association_resource, params, **)
+    end
+  end
+
+  def association_param_context(association, name, type, nested_params)
     association_types = association.resource_classes.index_by { |klass| type_formatter.call(klass.type) }
 
     raise invalid_type_error(name, type, association_types) if type && !association_types.key?(type)
 
-    association_types.flat_map do |resource_type, association_resource|
-      params = type && type != resource_type ? {} : normalize_params_tree(association_resource, nested_params, **)
-      params.map do |segment, value|
-        [[[resource_class, association.name], *segment], value]
-      end
+    recognized_names = type ? {} : recognized_param_names(association_types.values, nested_params)
+    consumed_names = recognized_names.values.reduce([], :|)
+
+    [association_types, recognized_names, consumed_names]
+  end
+
+  def skipped_resource_type?(type, resource_type)
+    type && type != resource_type
+  end
+
+  def association_param_values(resource_class, association, association_resource, params, **)
+    normalize_params_tree(association_resource, params, **).map do |segment, value|
+      [[[resource_class, association.name], *segment], value]
     end
+  end
+
+  def recognized_param_names(association_resources, nested_params)
+    return {} unless nested_params.is_a?(Hash)
+
+    names = nested_params.stringify_keys.keys
+
+    association_resources.to_h do |association_resource|
+      [association_resource, names.select { |name| recognized_param?(association_resource, name) }]
+    end
+  end
+
+  def association_nested_params(association_resource, nested_params, consumed_names, recognized_names)
+    return nested_params if consumed_names.blank? || !nested_params.is_a?(Hash)
+
+    branch_names = recognized_names.fetch(association_resource, [])
+    nested_params.stringify_keys.except(*(consumed_names - branch_names))
+  end
+
+  def recognized_param?(resource_class, name)
+    return true if relationship_chain(resource_class, name)
+
+    resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
+    name, = type_extractor.call(name)
+    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
+
+    transformed_members.key?(name)
   end
 
   def invalid_type_error(name, type, association_types)
