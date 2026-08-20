@@ -1,0 +1,344 @@
+# frozen_string_literal: true
+
+RSpec.describe OmniSerializer::Simple::QueryBuilder do
+  subject(:query_builder) { described_class.new }
+
+  describe '#call' do
+    subject(:query) { query_builder.call(resource, **options) }
+
+    let(:resource) { PostResource }
+    let(:options) { {} }
+
+    specify do
+      expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+        resource: PostResource,
+        members: [
+          { name: :id, arguments: {}, schema: nil },
+          { name: :post_title, arguments: {}, schema: nil },
+          { name: :post_content, arguments: {}, schema: nil }
+        ]
+      }))
+    end
+
+    context 'when only: is given' do
+      let(:options) { { only: :post_title, except: :invalid, extra: nil } }
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [{ name: :post_title, arguments: {}, schema: nil }]
+        }))
+      end
+    end
+
+    context 'when except: is given' do
+      let(:options) { { only: nil, except: :post_title, extra: :invalid } }
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :post_content, arguments: {}, schema: nil }
+          ]
+        }))
+      end
+    end
+
+    context 'when extra: is given' do
+      let(:options) do
+        {
+          only: %i[post_title tags],
+          except: :invalid,
+          extra: :tag_names,
+          foo: 42,
+          include: %i[post_author active_comments]
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: { foo: 42 }, schema: {
+          resource: PostResource,
+          members: [
+            { name: :post_title, arguments: {}, schema: nil },
+            { name: :tag_names, arguments: {}, schema: nil },
+            { name: :post_author, arguments: {}, schema: {
+              resource: UserResource,
+              members: [
+                { name: :id, arguments: {}, schema: nil },
+                { name: :user_name, arguments: {}, schema: nil }
+              ]
+            } },
+            { name: :active_comments, arguments: {}, schema: {
+              resource: CommentCollectionResource,
+              members: [
+                { name: :to_a, arguments: {}, schema: {
+                  resource: CommentResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :comment_body, arguments: {}, schema: nil }
+                  ]
+                } },
+                { name: :pagination, arguments: {}, schema: nil }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'when include: is given' do
+      let(:resource) { CommentResource }
+      let(:options) do
+        {
+          'include' => {
+            'post' => {
+              'only' => { 'post_title' => { 'bar' => 43 } },
+              'include' => 'post_author',
+              'foo' => 42
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: CommentResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :comment_body, arguments: {}, schema: nil },
+            { name: :post, arguments: { foo: 42 }, schema: {
+              resource: PostResource,
+              members: [
+                { name: :post_title, arguments: { bar: 43 }, schema: nil },
+                { name: :post_author, arguments: {}, schema: {
+                  resource: UserResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :user_name, arguments: {}, schema: nil }
+                  ]
+                } }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'with collection resource' do
+      let(:resource) { CommentCollectionResource }
+      let(:options) do
+        {
+          include: {
+            post: { only: :post_title, include: :post_author, foo: 42 }
+          },
+          bar: 43
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: { bar: 43 }, schema: {
+          resource: CommentCollectionResource,
+          members: [
+            { name: :to_a, arguments: {}, schema: {
+              resource: CommentResource,
+              members: [
+                { name: :id, arguments: {}, schema: nil },
+                { name: :comment_body, arguments: {}, schema: nil },
+                { name: :post, arguments: { foo: 42 }, schema: {
+                  resource: PostResource,
+                  members: [
+                    { name: :post_title, arguments: {}, schema: nil },
+                    { name: :post_author, arguments: {}, schema: {
+                      resource: UserResource,
+                      members: [
+                        { name: :id, arguments: {}, schema: nil },
+                        { name: :user_name, arguments: {}, schema: nil }
+                      ]
+                    } }
+                  ]
+                } }
+              ]
+            } },
+            { name: :pagination, arguments: {}, schema: nil }
+          ]
+        }))
+      end
+    end
+
+    context 'with collection resource on lower level' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          include: {
+            active_comments: {
+              only: [:id, { comment_body: { bar: 43 } }],
+              include: { comment_author: { except: :user_name } },
+              foo: 42
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :post_title, arguments: {}, schema: nil },
+            { name: :post_content, arguments: {}, schema: nil },
+            { name: :active_comments, arguments: { foo: 42 }, schema: {
+              resource: CommentCollectionResource,
+              members: [
+                { name: :to_a, arguments: {}, schema: {
+                  resource: CommentResource,
+                  members: [
+                    { name: :id, arguments: {}, schema: nil },
+                    { name: :comment_body, arguments: { bar: 43 }, schema: nil },
+                    { name: :comment_author, arguments: {}, schema: {
+                      resource: UserResource,
+                      members: [{ name: :id, arguments: {}, schema: nil }]
+                    } }
+                  ]
+                } },
+                { name: :pagination, arguments: {}, schema: nil }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'with collection wrapper options on lower level' do
+      let(:resource) { PostResource }
+      let(:options) do
+        {
+          'include' => {
+            'active_comments' => {
+              'only' => 'comment_body',
+              'collection' => { 'only' => 'current_page' }
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: PostResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :post_title, arguments: {}, schema: nil },
+            { name: :post_content, arguments: {}, schema: nil },
+            { name: :active_comments, arguments: {}, schema: {
+              resource: CommentCollectionResource,
+              members: [
+                { name: :to_a, arguments: {}, schema: {
+                  resource: CommentResource,
+                  members: [{ name: :comment_body, arguments: {}, schema: nil }]
+                } },
+                { name: :current_page, arguments: {}, schema: nil }
+              ]
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'with polymorphic association' do
+      let(:resource) { TaggingResource }
+      let(:options) do
+        {
+          include: [:tag, {
+            taggable: {
+              only: [:post_title, { comment_body: { foo: 42 } }],
+              include: { post_author: { extra: [:post_tag_names, { comment_tag_names: { bar: 43 } }] } }
+            }
+          }]
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: TaggingResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :tag, arguments: {}, schema: {
+              resource: TagResource,
+              members: [
+                { name: :id, arguments: {}, schema: nil },
+                { name: :tag_name, arguments: {}, schema: nil }
+              ]
+            } },
+            { name: :taggable, arguments: {}, schema: {
+              Post => {
+                resource: PostResource,
+                members: [
+                  { name: :post_title, arguments: {}, schema: nil },
+                  { name: :post_author, arguments: {}, schema: {
+                    resource: UserResource,
+                    members: [
+                      { name: :id, arguments: {}, schema: nil },
+                      { name: :user_name, arguments: {}, schema: nil },
+                      { name: :post_tag_names, arguments: {}, schema: nil },
+                      { name: :comment_tag_names, arguments: { bar: 43 }, schema: nil }
+                    ]
+                  } }
+                ]
+              },
+              Comment => {
+                resource: CommentResource,
+                members: [{ name: :comment_body, arguments: { foo: 42 }, schema: nil }]
+              }
+            } }
+          ]
+        }))
+      end
+    end
+
+    context 'with polymorphic association per-type query options' do
+      let(:resource) { TagResource }
+      let(:options) do
+        {
+          'include' => {
+            'taggables' => {
+              'foo' => 42,
+              'types' => { 'post' => { 'include' => 'tags' } },
+              'except' => 'id'
+            }
+          }
+        }
+      end
+
+      specify do
+        expect(query).to eq(OmniSerializer::Query.new(name: :root, arguments: {}, schema: {
+          resource: TagResource,
+          members: [
+            { name: :id, arguments: {}, schema: nil },
+            { name: :tag_name, arguments: {}, schema: nil },
+            { name: :taggables, arguments: { foo: 42 }, schema: {
+              Post => {
+                resource: PostResource,
+                members: [
+                  { name: :id, arguments: {}, schema: nil },
+                  { name: :post_title, arguments: {}, schema: nil },
+                  { name: :post_content, arguments: {}, schema: nil },
+                  { name: :tags, arguments: {}, schema: {
+                    resource: TagResource,
+                    members: [
+                      { name: :id, arguments: {}, schema: nil },
+                      { name: :tag_name, arguments: {}, schema: nil }
+                    ]
+                  } }
+                ]
+              },
+              Comment => {
+                resource: CommentResource,
+                members: [{ name: :comment_body, arguments: {}, schema: nil }]
+              }
+            } }
+          ]
+        }))
+      end
+    end
+  end
+end

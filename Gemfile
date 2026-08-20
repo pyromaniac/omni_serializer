@@ -5,6 +5,13 @@ source 'https://rubygems.org'
 # Specify your gem's dependencies in omni_serializer.gemspec
 gemspec
 
+gem 'activerecord'
+gem 'database_cleaner-active_record'
+gem 'db-query-matchers'
+gem 'dry-inflector'
+gem 'hashdiff'
+gem 'pg'
+gem 'rainbow'
 gem 'rake'
 gem 'rspec'
 gem 'rubocop'

@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
 
-  spec.add_dependency 'dataloader'
+  spec.add_dependency 'concurrent-ruby'
   spec.add_dependency 'dry-initializer'
   spec.add_dependency 'dry-struct'
   spec.add_dependency 'dry-types'
