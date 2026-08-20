@@ -121,6 +121,37 @@ RSpec.describe OmniSerializer::Jsonapi::FamilyNormalizer do
         end
       end
 
+      context 'when the collection member is polymorphic' do
+        let(:resource_class) { TaggableCollectionResource }
+
+        context 'with a relationship every type declares' do
+          let(:param) { { 'tags' => 'foo' } }
+
+          it 'follows it into each of them' do
+            expect(result).to eq(
+              [[PostResource, :tags]] => { _leaf: 'foo', _on: 'TagResource' },
+              [[CommentResource, :tags]] => { _leaf: 'foo', _on: 'TagResource' }
+            )
+          end
+        end
+
+        context 'with a relationship only one type declares' do
+          let(:param) { { 'post-author' => 'foo' } }
+
+          it 'leaves the others alone rather than reading it as an unknown param' do
+            expect(result).to eq([[PostResource, :post_author]] => { _leaf: 'foo', _on: 'UserResource' })
+          end
+        end
+
+        context 'with a param naming the collection itself' do
+          let(:param) { { 'id' => %w[1 2] } }
+
+          it 'writes it once rather than once per type' do
+            expect(result).to eq([] => { id: { _leaf: %w[1 2], _on: :id } })
+          end
+        end
+      end
+
       context 'when param is an array with accociation hashes' do
         let(:param) { ['foo', { 'active-comments' => 42 }, 'bar', { 'post-author' => 43 }] }
 

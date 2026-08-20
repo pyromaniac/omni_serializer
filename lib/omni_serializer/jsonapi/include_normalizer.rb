@@ -45,11 +45,14 @@ class OmniSerializer::Jsonapi::IncludeNormalizer
     include_chains.group_by(&:first).transform_values { |values| values.map(&:last).inject({}, :merge) }
   end
 
+  # A collection member is polymorphic when the collection serves several types,
+  # so it resolves to one resource per type the same way an association does.
   def normalize_collection_includes(resource_class, includes_tree)
-    {
-      [resource_class.collection_member.name, resource_class.collection_member.resolved_resource] =>
-        normalize_includes_tree(resource_class.collection_member.resolved_resource, includes_tree)
-    }
+    member = resource_class.collection_member
+
+    member.resource_classes.to_h do |klass|
+      [[member.name, klass], normalize_includes_tree(klass, includes_tree)]
+    end
   end
 
   def include_chain(resource_class, name, nested_includes, transformed_associations)

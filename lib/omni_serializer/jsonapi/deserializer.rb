@@ -123,12 +123,22 @@ class OmniSerializer::Jsonapi::Deserializer
   end
 
   def resolve_association_types(association)
-    if !association.polymorphic? && association.resolved_resource.collection?
-      association = association.resolved_resource.collection_member
-    end
-
+    association = effective_association(association)
     association_types = association.resource_classes.index_by { |klass| type_formatter.call(klass.type) }
     remap_association_types(association, association_types)
+  end
+
+  # A relationship naming a collection resource carries one resource itself, so
+  # whether it is polymorphic is decided by the collection it points at. Its own
+  # name still supplies the keys the params are written under.
+  def effective_association(association)
+    return association if association.polymorphic? || !association.resolved_resource.collection?
+
+    association.resolved_resource.collection_member
+  end
+
+  def polymorphic_association?(association)
+    effective_association(association).polymorphic?
   end
 
   def remap_association_types(association, association_types)
@@ -146,7 +156,7 @@ class OmniSerializer::Jsonapi::Deserializer
     end
 
     linked_data_exists = data.any? { |datum| datum.key?(:lid) || included.key?(datum.slice(:id, :lid, :type)) }
-    if linked_data_exists || association.polymorphic?
+    if linked_data_exists || polymorphic_association?(association)
       deep_collection_relationship_params(association, association_types, data, included:, pointer:)
     else
       flat_collection_relationship_params(association, data, pointer:)
@@ -189,7 +199,7 @@ class OmniSerializer::Jsonapi::Deserializer
       params[:id] = datum[:id]
       pointers[[index, :id]] = "#{pointer}/#{index}/id"
     end
-    if association.polymorphic?
+    if polymorphic_association?(association)
       params[:type] = association_types.fetch(datum[:type]).second
       pointers[[index, :type]] = "#{pointer}/#{index}/type"
     end
@@ -236,7 +246,7 @@ class OmniSerializer::Jsonapi::Deserializer
   def singular_relationship_simple_params(association, association_types, data, id_key, pointer:)
     type_key = :"#{association.name}_type"
 
-    if association.polymorphic?
+    if polymorphic_association?(association)
       [
         {
           id_key => data[:id],
@@ -255,7 +265,7 @@ class OmniSerializer::Jsonapi::Deserializer
       params[:id] = linked_data[:id]
       pointers[:id] = "#{linked_data[:pointer]}/id"
     end
-    if association.polymorphic?
+    if polymorphic_association?(association)
       params[:type] = model_name
       pointers[:type] = "#{linked_data[:pointer]}/type"
     end

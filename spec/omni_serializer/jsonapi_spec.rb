@@ -433,6 +433,47 @@ RSpec.describe OmniSerializer::Jsonapi do
       end
     end
 
+    context 'with a polymorphic collection relationship' do
+      let!(:tag) { Tag.create!(name: 'Tag 1', posts: [post1], comments: [comment1, comment2]) }
+
+      it 'serializes each type through its own resource and counts them together' do
+        expect(serializer.serialize(tag, with: TaggableHolderResource, params: { include: 'taggables' }))
+          .to eq({
+            data: {
+              id: tag.id.to_s,
+              type: 'taggable_holders',
+              attributes: {},
+              relationships: {
+                'taggables' => {
+                  data: [
+                    { id: post1.id.to_s, type: 'posts' },
+                    { id: comment1.id.to_s, type: 'comments' },
+                    { id: comment2.id.to_s, type: 'comments' }
+                  ],
+                  meta: { 'pagination' => { 'total_count' => 3, 'total_pages' => 1, 'current_page' => 1 } }
+                }
+              }
+            },
+            included: [{
+              id: post1.id.to_s,
+              type: 'posts',
+              attributes: { 'post_title' => 'Post 1', 'post_content' => { 'foo' => 42 } },
+              relationships: { 'post_author' => {}, 'active_comments' => {}, 'taggings' => {}, 'tags' => {} }
+            }, {
+              id: comment1.id.to_s,
+              type: 'comments',
+              attributes: { 'comment_body' => 'Comment 1' },
+              relationships: { 'post' => {}, 'comment_author' => {}, 'taggings' => {}, 'tags' => {} }
+            }, {
+              id: comment2.id.to_s,
+              type: 'comments',
+              attributes: { 'comment_body' => 'Comment 2' },
+              relationships: { 'post' => {}, 'comment_author' => {}, 'taggings' => {}, 'tags' => {} }
+            }]
+          })
+      end
+    end
+
     context 'with invalid relationship' do
       specify do
         expect { serializer.serialize(post1, with: PostResource, relationship: 'postAuthor') }

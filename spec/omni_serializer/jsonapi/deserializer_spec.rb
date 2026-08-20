@@ -661,6 +661,44 @@ RSpec.describe OmniSerializer::Jsonapi::Deserializer do
       end
     end
 
+    context 'when the relationship names a polymorphic collection resource' do
+      let(:resource_class) { TaggableHolderResource }
+      let(:data) do
+        {
+          type: 'taggable-holders',
+          relationships: {
+            taggables: { data: [
+              { id: '42', type: 'posts' },
+              { id: '43', type: 'comments' }
+            ] }
+          }
+        }
+      end
+
+      it 'keeps the type of each datum, as a directly polymorphic one does' do
+        expect(result).to have_attributes(
+          params: {
+            taggables: [
+              { id: '42', type: 'Post' },
+              { id: '43', type: 'Comment' }
+            ]
+          },
+          pointers: {
+            [] => '/data',
+            [:id] => '/data/id',
+            [:type] => '/data/type',
+            [:taggables] => '/data/relationships/taggables/data',
+            [:taggables, 0] => '/data/relationships/taggables/data/0',
+            [:taggables, 1] => '/data/relationships/taggables/data/1',
+            [:taggables, 0, :id] => '/data/relationships/taggables/data/0/id',
+            [:taggables, 1, :id] => '/data/relationships/taggables/data/1/id',
+            [:taggables, 0, :type] => '/data/relationships/taggables/data/0/type',
+            [:taggables, 1, :type] => '/data/relationships/taggables/data/1/type'
+          }
+        )
+      end
+    end
+
     context 'with polymorphic collection relationship' do
       let(:resource_class) { TagResource }
       let(:data) do

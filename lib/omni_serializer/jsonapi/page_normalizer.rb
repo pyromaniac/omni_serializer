@@ -24,7 +24,22 @@ class OmniSerializer::Jsonapi::PageNormalizer
   def normalize_params_tree(resource_class, nested_params, display_path:, query_path:)
     return leaf_params_tree(query_path, nested_params, display_path:) unless nested_params.is_a?(Hash)
 
-    resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
+    trees = member_resource_classes(resource_class).map do |member_resource_class|
+      resource_params_tree(member_resource_class, nested_params, display_path:, query_path:)
+    end
+
+    trees.inject({}) { |result, tree| OmniSerializer::Utils.deep_merge(result, tree) }
+  end
+
+  # A collection serving several types resolves to one resource per type, so a
+  # param naming a member has to be looked for in each of them.
+  def member_resource_classes(resource_class)
+    return [resource_class] unless resource_class.collection?
+
+    resource_class.collection_member.resource_classes
+  end
+
+  def resource_params_tree(resource_class, nested_params, display_path:, query_path:)
     transformed_associations = transformed_associations(resource_class)
 
     leaf_params, relationship_params = partition_params(nested_params, transformed_associations, display_path:)

@@ -88,6 +88,18 @@ RSpec.describe OmniSerializer::Jsonapi::IncludeNormalizer do
       end
     end
 
+    context 'when the collection member itself is polymorphic' do
+      let(:resource_class) { TaggableCollectionResource }
+      let(:include) { 'tags' }
+
+      it 'normalizes the nested includes once per type the collection serves' do
+        expect(result).to eq({
+          [:to_a, PostResource] => { [:tags, TagResource] => {} },
+          [:to_a, CommentResource] => { [:tags, TagResource] => {} }
+        })
+      end
+    end
+
     context 'with polymorphic includes' do
       let(:resource_class) { TagResource }
       let(:include) { 'taggables.tags' }

@@ -38,12 +38,28 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
   end
 
   def param_trees(resource_class, nested_params, path:)
-    resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
-    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
-
     (nested_params || {}).flat_map do |(name, value)|
-      params_chain(resource_class, name, value, transformed_members, path:)
+      collection_branches.call(member_resource_classes(resource_class), name).flat_map do |klass, members|
+        params_chain(klass, name, value, members, path:)
+      end
     end
+  end
+
+  # A collection serves several types, and each of them answers for itself.
+  def member_resource_classes(resource_class)
+    return [resource_class] unless resource_class.collection?
+
+    resource_class.collection_member.resource_classes
+  end
+
+  def member_names(resource_class)
+    resource_class.members.values.map { |member| key_formatter.call(member.name) }
+  end
+
+  def collection_branches
+    @collection_branches ||= OmniSerializer::Jsonapi::CollectionBranches.new(
+      key_formatter:, type_extractor:, relationship_resolver: method(:relationship_chain)
+    )
   end
 
   def params_chain(resource_class, name, nested_params, transformed_members, path:)
@@ -82,7 +98,11 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
   end
 
   def relationship_chain(resource_class, name)
-    resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
+    member_resource_classes(resource_class)
+      .filter_map { |klass| resource_relationship_chain(klass, name) }.flatten(1).presence
+  end
+
+  def resource_relationship_chain(resource_class, name)
     relationship_name, nested_name = name.split('.', 2)
 
     association = association_for(resource_class, relationship_name)
@@ -105,8 +125,7 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
 
   def association_for(resource_class, relationship_name)
     name, = type_extractor.call(relationship_name)
-    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
-    member = transformed_members[name]
+    member = resource_class.members.values.find { |candidate| key_formatter.call(candidate.name) == name }
 
     member if member.is_a?(OmniSerializer::Resource::Association)
   end
@@ -186,11 +205,9 @@ class OmniSerializer::Jsonapi::FamilyNormalizer
   def recognized_param?(resource_class, name)
     return true if relationship_chain(resource_class, name)
 
-    resource_class = resource_class.collection_member.resolved_resource if resource_class.collection?
     name, = type_extractor.call(name)
-    transformed_members = resource_class.members.values.index_by { |member| key_formatter.call(member.name) }
 
-    transformed_members.key?(name)
+    member_resource_classes(resource_class).any? { |klass| member_names(klass).include?(name) }
   end
 
   def invalid_type_error(name, type, association_types)

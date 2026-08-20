@@ -64,6 +64,18 @@ RSpec.describe OmniSerializer::Jsonapi::PageNormalizer do
       end
     end
 
+    context 'when the collection member is polymorphic' do
+      let(:resource_class) { TaggableCollectionResource }
+      let(:page) { { tags: { number: 2, size: 10 } } }
+
+      it 'stores the leaf under each type the collection serves' do
+        expect(normalized).to eq(
+          [[PostResource, :tags]] => { number: 2, size: 10 },
+          [[CommentResource, :tags]] => { number: 2, size: 10 }
+        )
+      end
+    end
+
     context 'when resource has reserved names' do
       before do
         stub_const(

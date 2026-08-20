@@ -178,6 +178,28 @@ class TaggingResource < BaseResource
   end
 end
 
+class TaggableCollectionResource < PaginatedCollectionResource
+  collection resource: { Post => 'PostResource', Comment => 'CommentResource' } do
+    loaders.collection(Post.joins(:taggings), %i[taggings tag_id]).load(parent.id).zip(
+      loaders.collection(Comment.joins(:taggings), %i[taggings tag_id]).load(parent.id)
+    ).then { |posts, comments| posts + comments }
+  end
+
+  private
+
+  def total_count
+    loaders.aggregate(Tagging, :tag_id, :count).load(parent.id)
+  end
+end
+
+# Names one resource, which is a collection serving several types — so the
+# relationship is polymorphic through the collection rather than in itself.
+class TaggableHolderResource < BaseResource
+  has_many :taggables, resource: 'TaggableCollectionResource' do
+    []
+  end
+end
+
 class TagResource < BaseResource
   attribute :tag_name do
     object.name
